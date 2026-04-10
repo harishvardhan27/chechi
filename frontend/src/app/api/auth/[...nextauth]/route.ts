@@ -17,9 +17,6 @@ export const authOptions = {
   },
   callbacks: {
     async jwt({ token, user, account }) {
-      // If userId already in token (subsequent requests), skip re-registration
-      if (token.userId) return token;
-
       // If signing in for the first time, save user info in token
       if (account && user) {
         token.accessToken = account.access_token;

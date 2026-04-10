@@ -223,6 +223,8 @@ const QuizEditor = forwardRef<QuizEditorHandle, QuizEditorProps>(({
                     }
                 } catch (error) {
                     console.error('Error fetching school scorecards:', error);
+                    // Still fetch questions even if scorecards fail
+                    await fetchQuestions();
                 } finally {
                     setIsLoadingScorecards(false);
                 }

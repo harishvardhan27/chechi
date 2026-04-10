@@ -40,6 +40,7 @@ from api.config import (
     task_completions_table_name,
     questions_table_name,
     user_cohorts_table_name,
+    users_table_name,
 )
 import json
 
@@ -76,6 +77,28 @@ class PriorityInsight(BaseModel):
 class InsightOutput(BaseModel):
     summary: str = Field(description="One sentence summary of the cohort's current state")
     insights: list[PriorityInsight] = Field(description="Prioritized list of insights, highest severity first")
+
+
+class LearnerScores(BaseModel):
+    engagement: float = Field(description="0-10 score for how actively the learner engages with the material")
+    understanding: float = Field(description="0-10 score for conceptual understanding based on chat quality and completions")
+    persistence: float = Field(description="0-10 score for how much the learner keeps trying when stuck")
+    velocity: float = Field(description="0-10 score for pace of task completion relative to cohort")
+    independence: float = Field(description="0-10 score for how self-sufficient the learner is (low AI reliance = high independence)")
+
+
+class LearnerCharacteristics(BaseModel):
+    learning_style: str = Field(description="e.g. 'visual-conceptual', 'trial-and-error', 'methodical'")
+    strengths: list[str] = Field(description="2-3 specific strengths observed from behavior")
+    struggle_areas: list[str] = Field(description="2-3 specific areas where the learner consistently struggles")
+    behavioral_pattern: str = Field(description="One sentence describing the learner's overall behavioral pattern")
+    recommended_intervention: str = Field(description="Most impactful next action a mentor should take")
+
+
+class LearnerProfile(BaseModel):
+    scores: LearnerScores
+    characteristics: LearnerCharacteristics
+    summary: str = Field(description="2-3 sentence narrative summary of this learner for a mentor")
 
 
 # ---------------------------------------------------------------------------
@@ -485,3 +508,154 @@ async def classify_task_signal(task_id: int, cohort_id: int):
 async def get_friction_score(learner_id: int, task_id: int, cohort_id: int):
     """Returns the friction score and contributing signals for a learner on a task."""
     return await compute_friction_score(learner_id, task_id, cohort_id)
+
+
+# ---------------------------------------------------------------------------
+# NEW: Learner Profile — OpenAI-powered scores + characteristics
+# ---------------------------------------------------------------------------
+
+async def _build_learner_context(learner_id: int, cohort_id: int) -> str:
+    """Fetch raw learner data from DB and format it as a prompt context string."""
+    from api.db.intelligence import (
+        get_repetition_signals,
+        get_struggle_language_signals,
+        get_no_submission_signals,
+        get_escalation_ladder_signals,
+        get_time_on_task_signals,
+    )
+
+    # Learner info
+    learner_row = await execute_db_operation(
+        f"SELECT first_name, last_name, email FROM {users_table_name} WHERE id = ? AND deleted_at IS NULL",
+        (learner_id,),
+        fetch_one=True,
+    )
+    if not learner_row:
+        raise HTTPException(status_code=404, detail="Learner not found")
+    name = f"{learner_row[0] or ''} {learner_row[1] or ''}".strip() or learner_row[2]
+
+    # Total tasks completed in cohort
+    completed_row = await execute_db_operation(
+        f"""
+        SELECT COUNT(DISTINCT tc.task_id)
+        FROM {task_completions_table_name} tc
+        JOIN {course_tasks_table_name} ct ON tc.task_id = ct.task_id
+        JOIN {course_cohorts_table_name} cc ON ct.course_id = cc.course_id
+        WHERE tc.user_id = ? AND cc.cohort_id = ?
+        """,
+        (learner_id, cohort_id),
+        fetch_one=True,
+    )
+    tasks_completed = completed_row[0] if completed_row else 0
+
+    # Total tasks in cohort
+    total_tasks_row = await execute_db_operation(
+        f"""
+        SELECT COUNT(DISTINCT ct.task_id)
+        FROM {course_tasks_table_name} ct
+        JOIN {course_cohorts_table_name} cc ON ct.course_id = cc.course_id
+        WHERE cc.cohort_id = ?
+        """,
+        (cohort_id,),
+        fetch_one=True,
+    )
+    total_tasks = total_tasks_row[0] if total_tasks_row else 0
+
+    # Total chat messages sent
+    chat_row = await execute_db_operation(
+        f"""
+        SELECT COUNT(*)
+        FROM {chat_history_table_name} ch
+        JOIN {questions_table_name} q ON ch.question_id = q.id
+        JOIN {course_tasks_table_name} ct ON q.task_id = ct.task_id
+        JOIN {course_cohorts_table_name} cc ON ct.course_id = cc.course_id
+        WHERE ch.user_id = ? AND cc.cohort_id = ? AND ch.role = 'user' AND ch.deleted_at IS NULL
+        """,
+        (learner_id, cohort_id),
+        fetch_one=True,
+    )
+    total_chat_messages = chat_row[0] if chat_row else 0
+
+    # Velocity
+    velocity = await compute_completion_velocity(learner_id, cohort_id)
+
+    # Signals for this learner
+    all_signals = [
+        s for signals in [
+            await get_repetition_signals(cohort_id),
+            await get_struggle_language_signals(cohort_id),
+            await get_no_submission_signals(cohort_id),
+            await get_escalation_ladder_signals(cohort_id),
+            await get_time_on_task_signals(cohort_id),
+        ]
+        for s in signals
+        if s["user_id"] == learner_id
+    ]
+
+    # Recent completed tasks
+    recent_rows = await execute_db_operation(
+        f"""
+        SELECT t.title, tc.created_at
+        FROM {task_completions_table_name} tc
+        JOIN {tasks_table_name} t ON tc.task_id = t.id
+        JOIN {course_tasks_table_name} ct ON tc.task_id = ct.task_id
+        JOIN {course_cohorts_table_name} cc ON ct.course_id = cc.course_id
+        WHERE tc.user_id = ? AND cc.cohort_id = ? AND tc.task_id IS NOT NULL
+        ORDER BY tc.created_at DESC LIMIT 5
+        """,
+        (learner_id, cohort_id),
+        fetch_all=True,
+    )
+
+    lines = [
+        f"Learner: {name}",
+        f"Tasks completed: {tasks_completed}/{total_tasks}",
+        f"Total chat messages sent: {total_chat_messages}",
+        f"Completion velocity — recent: {velocity['tasks_per_day_recent']}/day, prior: {velocity['tasks_per_day_prior']}/day, drop: {velocity['drop_pct']}%, risk: {velocity['velocity_risk']}",
+    ]
+
+    if recent_rows:
+        lines.append("Recently completed tasks: " + ", ".join(r[0] for r in recent_rows))
+
+    if all_signals:
+        lines.append(f"\nBehavioral signals ({len(all_signals)} total):")
+        for s in all_signals[:10]:
+            lines.append(f"  [{s['signal']}] {s['description']} (task: {s.get('task_title', 'unknown')}, severity: {s['severity']})")
+    else:
+        lines.append("\nNo struggle signals detected.")
+
+    return "\n".join(lines)
+
+
+@router.get("/learner/{learner_id}/profile")
+async def get_learner_profile(learner_id: int, cohort_id: int):
+    """
+    Uses OpenAI to generate scores and characteristics for a learner
+    based on their activity data in a cohort.
+    """
+    context = await _build_learner_context(learner_id, cohort_id)
+
+    system_prompt = (
+        "You are an expert learning analyst. Given a learner's behavioral data from an LMS, "
+        "produce accurate scores (0-10) and qualitative characteristics. "
+        "Base everything strictly on the data provided. Do not invent information."
+    )
+
+    result = await run_llm_with_openai(
+        model=openai_plan_to_model_name["text-mini"],
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": context},
+        ],
+        response_model=LearnerProfile,
+        max_output_tokens=1024,
+        api_mode="chat_completions",
+    )
+
+    return {
+        "learner_id": learner_id,
+        "cohort_id": cohort_id,
+        "scores": result.scores.model_dump(),
+        "characteristics": result.characteristics.model_dump(),
+        "summary": result.summary,
+    }

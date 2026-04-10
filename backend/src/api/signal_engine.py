@@ -102,13 +102,14 @@ async def _get_time_on_task_minutes(learner_id: int, task_id: int) -> float:
     """Returns total minutes spent across all sessions on this task."""
     row = await execute_db_operation(
         f"""
-        SELECT ROUND(
-            SUM((JULIANDAY(MAX(ch.created_at)) - JULIANDAY(MIN(ch.created_at))) * 24 * 60), 1
+        SELECT ROUND(SUM(session_minutes), 1)
+        FROM (
+            SELECT (JULIANDAY(MAX(ch.created_at)) - JULIANDAY(MIN(ch.created_at))) * 24 * 60 AS session_minutes
+            FROM {chat_history_table_name} ch
+            JOIN {questions_table_name} q ON ch.question_id = q.id
+            WHERE ch.user_id = ? AND q.task_id = ? AND ch.deleted_at IS NULL
+            GROUP BY DATE(ch.created_at)
         )
-        FROM {chat_history_table_name} ch
-        JOIN {questions_table_name} q ON ch.question_id = q.id
-        WHERE ch.user_id = ? AND q.task_id = ? AND ch.deleted_at IS NULL
-        GROUP BY DATE(ch.created_at)
         """,
         (learner_id, task_id),
         fetch_one=True,

@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { HelpCircle, ChevronRight, ArrowUp, ArrowDown, Search } from "lucide-react";
+import { HelpCircle, ChevronRight, ArrowUp, ArrowDown, Search, Sparkles } from "lucide-react";
 import Tooltip from "@/components/Tooltip";
 import ClientLeaderboardView from "@/app/school/[id]/cohort/[cohortId]/leaderboard/ClientLeaderboardView";
 import TaskTypeMetricCard from "@/components/TaskTypeMetricCard";
+import LearnerProfilePanel from "@/components/LearnerProfilePanel";
 import { CohortWithDetails as Cohort, CohortMember } from "@/types";
 
 interface TaskTypeMetrics {
@@ -56,6 +57,10 @@ export default function CohortDashboard({ cohort, cohortId, schoolId, schoolSlug
 
     // State for search functionality
     const [searchQuery, setSearchQuery] = useState<string>('');
+
+    // State for learner profile panel
+    const [profileLearnerId, setProfileLearnerId] = useState<number | null>(null);
+    const [profileLearnerName, setProfileLearnerName] = useState<string>('');
 
     // Handle column header click for sorting
     const handleSort = (column: string) => {
@@ -202,6 +207,7 @@ export default function CohortDashboard({ cohort, cohortId, schoolId, schoolSlug
     const activeCourse = cohort?.courses?.find(course => course.id === activeCourseId) || cohort?.courses?.[0];
 
     return (
+        <>
         <div>
             <div className="flex flex-col lg:flex-row gap-8">
                 <div className="lg:w-2/3">
@@ -745,13 +751,25 @@ export default function CohortDashboard({ cohort, cohortId, schoolId, schoolSlug
                                                         </td>
                                                     )}
                                                     <td className="p-4 text-right">
-                                                        <Link
-                                                            href={`/school/${schoolSlug}/courses/${activeCourseId || cohort.courses?.[0]?.id}/learner-view/${studentId}?cohortId=${cohort.id}`}
-                                                            target="_blank"
-                                                            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-sm text-gray-900 dark:bg-white/10 dark:hover:bg-white/15 dark:text-white rounded-md transition-colors cursor-pointer"
-                                                        >
-                                                            View as learner
-                                                        </Link>
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <button
+                                                                onClick={() => {
+                                                                    setProfileLearnerId(parseInt(studentId));
+                                                                    setProfileLearnerName(formatLearnerName(member));
+                                                                }}
+                                                                className="flex items-center gap-1 px-3 py-1.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-sm rounded-md hover:opacity-80 transition-opacity cursor-pointer"
+                                                            >
+                                                                <Sparkles size={12} />
+                                                                AI profile
+                                                            </button>
+                                                            <Link
+                                                                href={`/school/${schoolSlug}/courses/${activeCourseId || cohort.courses?.[0]?.id}/learner-view/${studentId}?cohortId=${cohort.id}`}
+                                                                target="_blank"
+                                                                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-sm text-gray-900 dark:bg-white/10 dark:hover:bg-white/15 dark:text-white rounded-md transition-colors cursor-pointer"
+                                                            >
+                                                                View as learner
+                                                            </Link>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             );
@@ -764,5 +782,15 @@ export default function CohortDashboard({ cohort, cohortId, schoolId, schoolSlug
                 </div>
             )}
         </div>
+
+            {profileLearnerId !== null && (
+                <LearnerProfilePanel
+                    learnerId={profileLearnerId}
+                    cohortId={parseInt(cohortId)}
+                    learnerName={profileLearnerName}
+                    onClose={() => setProfileLearnerId(null)}
+                />
+            )}
+        </>
     );
 } 

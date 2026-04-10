@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Header } from "@/components/layout/header";
-import { Users, BookOpen, Layers, ArrowLeft, UsersRound, X, Plus, Trash2, Upload, Mail, ChevronDown, Check, FileText, ChevronRight, GraduationCap, School, HelpCircle, Pencil, ExternalLink, Settings, Search } from "lucide-react";
+import { Users, BookOpen, Layers, ArrowLeft, UsersRound, X, Plus, Trash2, Upload, Mail, ChevronDown, Check, FileText, ChevronRight, GraduationCap, School, HelpCircle, Pencil, ExternalLink, Settings, Search, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ConfirmationDialog from "@/components/ConfirmationDialog";
@@ -15,6 +15,7 @@ import CohortDashboard from "@/components/CohortDashboard";
 import CohortCoursesLinkerDropdown from "@/components/CohortCoursesLinkerDropdown";
 import SettingsDialog from "@/components/SettingsDialog";
 import CreateBatchDialog from "@/components/CreateBatchDialog";
+import CohortIntelligence from "@/components/CohortIntelligence";
 import { CohortWithDetails as Cohort } from "@/types";
 import { DripConfig } from "@/types/course";
 
@@ -26,7 +27,7 @@ interface Course {
     drip_config?: DripConfig;
 }
 
-type TabType = 'dashboard' | 'learners' | 'mentors' | 'batches';
+type TabType = 'dashboard' | 'learners' | 'mentors' | 'batches' | 'intelligence';
 
 interface ClientCohortPageProps {
     schoolId: string;
@@ -893,6 +894,15 @@ export default function ClientCohortPage({ schoolId, cohortId }: ClientCohortPag
                                         Batches
                                     </div>
                                 </button>
+                                <button
+                                    className={`flex-1 px-4 py-2 font-light cursor-pointer ${tab === 'intelligence' ? 'text-black dark:text-white border-b-2 border-black dark:border-white' : 'text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white'}`}
+                                    onClick={() => setTab('intelligence')}
+                                >
+                                    <div className="flex items-center justify-center">
+                                        <Sparkles size={16} className="mr-2" />
+                                        Intelligence
+                                    </div>
+                                </button>
                             </div>
                         </div>
 
@@ -949,6 +959,10 @@ export default function ClientCohortPage({ schoolId, cohortId }: ClientCohortPag
                                     } : null);
                                 }}
                             />
+                        )}
+
+                        {tab === 'intelligence' && (
+                            <CohortIntelligence cohortId={cohortId} />
                         )}
 
                         {tab === 'batches' && (
