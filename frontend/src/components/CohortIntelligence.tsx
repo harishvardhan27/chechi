@@ -183,9 +183,48 @@ export default function CohortIntelligence({ cohortId }: CohortIntelligenceProps
             .finally(() => setLoadingBriefing(false));
 
         setLoadingInsights(true);
-        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/cohort/${cohortId}/insights?persona=mentor`)
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/cohort/${cohortId}/signals`)
             .then(r => { if (!r.ok) throw new Error("Failed to load insights"); return r.json(); })
-            .then(setInsights)
+            .then(data => {
+                // Build insights from raw signals without needing OpenAI
+                const individuals = data.individual_issues ?? [];
+                const systemic = data.systemic_issues ?? [];
+                const summary = data.summary ?? {};
+
+                const insights: PriorityInsight[] = [
+                    ...systemic.map((s: any) => ({
+                        issue_type: "systemic" as const,
+                        severity: s.severity ?? "medium",
+                        affected_entity: s.task_title,
+                        description: s.description,
+                        evidence: `${s.stuck_count}/${s.total_learners} learners stuck (${s.stuck_pct}%)`,
+                        recommended_action: {
+                            action_type: "content_revision",
+                            target: s.task_title,
+                            description: s.recommended_action ?? "Revise explanation or add prerequisite module.",
+                            urgency: s.severity === "high" ? "immediate" : "this_week",
+                        },
+                    })),
+                    ...individuals.slice(0, 5).map((l: any) => ({
+                        issue_type: "individual" as const,
+                        severity: l.severity ?? "medium",
+                        affected_entity: l.user_name,
+                        description: `${l.signals?.length ?? 0} struggle signal(s) detected.`,
+                        evidence: l.signals?.map((s: any) => s.signal).join(", ") ?? "",
+                        recommended_action: {
+                            action_type: "outreach",
+                            target: l.user_name,
+                            description: "Reach out with targeted support or resources.",
+                            urgency: l.severity === "high" ? "immediate" : "this_week",
+                        },
+                    })),
+                ];
+
+                setInsights({
+                    summary: `${summary.total_at_risk_learners ?? 0} at-risk learners, ${summary.total_systemic_issues ?? 0} systemic content issues detected.`,
+                    insights,
+                });
+            })
             .catch(e => setErrorInsights(e.message))
             .finally(() => setLoadingInsights(false));
     }, [cohortId]);

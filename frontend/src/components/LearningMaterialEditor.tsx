@@ -188,7 +188,7 @@ const LearningMaterialEditor = forwardRef<LearningMaterialEditorHandle, Learning
             // Clean up function will abort the fetch if the component unmounts
             // or if the effect runs again (i.e., taskId changes)
             return () => {
-                controller.abort();
+                controller.abort('cleanup');
             };
         } else {
             // If no taskId is provided, set loading to false immediately

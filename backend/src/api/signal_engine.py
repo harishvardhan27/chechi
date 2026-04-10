@@ -16,13 +16,14 @@ from api.config import (
     tasks_table_name,
     user_cohorts_table_name,
     users_table_name,
+    friction_computations_table_name,
 )
 
-# --- Weights for friction score (must sum to 1.0) ---
-WEIGHT_CHAT_TURNS = 0.30       # High chat volume = confusion
-WEIGHT_ATTEMPTS = 0.25         # Multiple attempts = struggle
-WEIGHT_LOW_SCORE = 0.25        # Low scorecard score = poor understanding
-WEIGHT_TIME_SPENT = 0.20       # Long time on task = friction
+from api.bandit import UCB1Bandit
+import uuid
+import json
+
+# --- Weights are now managed dynamically by RL (UCB1Bandit) in bandit.py ---
 
 # Thresholds for normalization
 MAX_CHAT_TURNS = 20            # 20+ turns → full weight
@@ -133,6 +134,9 @@ async def compute_friction_score(
       - low_score:   inverted normalized scorecard score
       - time_spent:  normalized time on task
     """
+    bandit = UCB1Bandit(cohort_id)
+    arm_id, weights = await bandit.select_arm()
+
     chat_turns = await _get_chat_turns(learner_id, task_id)
     attempts = await _get_attempt_count(learner_id, task_id)
     avg_score = await _get_avg_score(learner_id, task_id)
@@ -141,15 +145,36 @@ async def compute_friction_score(
     # Normalize each signal to [0, 1]
     chat_norm = min(chat_turns / MAX_CHAT_TURNS, 1.0)
     attempt_norm = min(attempts / MAX_ATTEMPTS, 1.0)
-    # If no score data, treat as neutral (0.5 friction contribution)
     score_norm = (1.0 - avg_score) if avg_score is not None else 0.5
     time_norm = min(time_minutes / MAX_TIME_MINUTES, 1.0)
 
+    # LLM Sentiment Extraction (optional — falls back to 0.5 if unavailable)
+    try:
+        from api.agentic_engine import extract_sentiment_score
+        llm_sentiment = await extract_sentiment_score(learner_id, task_id)
+    except Exception:
+        llm_sentiment = 0.5
+
     friction = (
-        WEIGHT_CHAT_TURNS * chat_norm
-        + WEIGHT_ATTEMPTS * attempt_norm
-        + WEIGHT_LOW_SCORE * score_norm
-        + WEIGHT_TIME_SPENT * time_norm
+        weights.chat * chat_norm
+        + weights.attempts * attempt_norm
+        + weights.score * score_norm
+        + weights.time * time_norm
+        + weights.llm * llm_sentiment
+    )
+
+    # Save to Friction computations for feedback loop
+    fc_id = str(uuid.uuid4())
+    signals_json = json.dumps({
+        "chat": chat_norm, "attempts": attempt_norm, "score": score_norm, "time": time_norm, "llm": llm_sentiment
+    })
+    await execute_db_operation(
+        f"""
+        INSERT INTO {friction_computations_table_name} 
+        (id, user_id, cohort_id, task_id, arm_id, friction_score, signals_json) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (fc_id, learner_id, cohort_id, task_id, arm_id, friction, signals_json)
     )
 
     reasons = []
@@ -161,6 +186,8 @@ async def compute_friction_score(
         reasons.append(f"low_score ({round(avg_score * 100)}%)")
     if time_norm >= 0.5:
         reasons.append(f"long_time_on_task ({time_minutes:.0f} min)")
+    if llm_sentiment >= 0.6:
+        reasons.append(f"high_frustration_detected")
 
     confidence = _compute_confidence(chat_turns, attempts, avg_score)
 
@@ -287,8 +314,8 @@ async def compute_completion_velocity(learner_id: int, cohort_id: int) -> Dict:
     prior_window = daily[:mid]
     recent_window = daily[mid:]
 
-    prior_avg = sum(d[1] for d in prior_window) / len(prior_window)
-    recent_avg = sum(d[1] for d in recent_window) / len(recent_window)
+    prior_avg = sum(d[1] for d in prior_window) / len(prior_window) if prior_window else 0.0
+    recent_avg = sum(d[1] for d in recent_window) / len(recent_window) if recent_window else 0.0
 
     drop_pct = ((prior_avg - recent_avg) / prior_avg) if prior_avg > 0 else 0.0
     velocity_risk = drop_pct >= VELOCITY_DROP_THRESHOLD

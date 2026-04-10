@@ -21,16 +21,16 @@ export default function RubricHeatmap({ data }: Props) {
           <table className="w-full text-xs border-separate border-spacing-1">
             <thead>
               <tr>
-                <th className="text-left text-white/30 font-medium pb-2 pr-4 min-w-[160px]">Task</th>
+                <th className="text-left text-gray-400 dark:text-white/30 font-medium pb-2 pr-4 min-w-[160px]">Task</th>
                 {criteria.map(c => (
-                  <th key={c} className="text-center text-white/40 font-medium pb-2 px-2 min-w-[90px]">{c}</th>
+                  <th key={c} className="text-center text-gray-500 dark:text-white/40 font-medium pb-2 px-2 min-w-[90px]">{c}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {tasks.map(task => (
                 <tr key={task}>
-                  <td className="text-white/70 pr-4 py-1 font-medium text-[11px] leading-tight max-w-[160px]">{task}</td>
+                  <td className="text-gray-700 dark:text-white/70 pr-4 py-1 font-medium text-[11px] leading-tight max-w-[160px]">{task}</td>
                   {criteria.map(criterion => {
                     const pct = lookup.get(`${task}||${criterion}`) ?? 0;
                     const bg = heatColor(pct);
@@ -55,7 +55,7 @@ export default function RubricHeatmap({ data }: Props) {
           {[["#22c55e", "< 25% (Good)"], ["#eab308", "25–50% (Watch)"], ["#f97316", "50–75% (Concern)"], ["#ef4444", "> 75% (Critical)"]].map(([c, l]) => (
             <div key={l} className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-sm" style={{ background: c }} />
-              <span>{l}</span>
+              <span className="text-gray-400 dark:text-white/30">{l}</span>
             </div>
           ))}
         </div>

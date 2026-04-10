@@ -34,9 +34,9 @@ export default function PriorityTable({ learners }: Props) {
       <CardContent className="px-0 pb-0">
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-white/5">
+            <tr className="border-b border-gray-100 dark:border-white/5">
               {["Learner", "Friction", "7-Day Trend", "Risk", "Velocity", "Last Active"].map(h => (
-                <th key={h} className="px-5 py-2 text-left text-white/30 font-medium">{h}</th>
+                <th key={h} className="px-5 py-2 text-left text-gray-400 dark:text-white/30 font-medium">{h}</th>
               ))}
             </tr>
           </thead>
@@ -44,19 +44,19 @@ export default function PriorityTable({ learners }: Props) {
             {top5.map((l, i) => {
               const color = frictionColor(l.frictionScore);
               return (
-                <tr key={l.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                <tr key={l.id} className="border-b border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[10px] text-white/50 font-bold">{i + 1}</span>
+                      <span className="w-5 h-5 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center text-[10px] text-gray-400 dark:text-white/50 font-bold">{i + 1}</span>
                       <div>
-                        <p className="text-white/90 font-medium">{l.name}</p>
-                        <p className="text-white/30">{l.email}</p>
+                        <p className="text-gray-900 dark:text-white/90 font-medium">{l.name}</p>
+                        <p className="text-gray-400 dark:text-white/30">{l.email}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2">
-                      <div className="w-16 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                      <div className="w-16 h-1.5 rounded-full bg-gray-200 dark:bg-white/10 overflow-hidden">
                         <div className="h-full rounded-full" style={{ width: `${l.frictionScore * 100}%`, background: color }} />
                       </div>
                       <span style={{ color }} className="font-semibold tabular-nums">{(l.frictionScore * 100).toFixed(0)}%</span>
@@ -69,7 +69,7 @@ export default function PriorityTable({ learners }: Props) {
                   <td className="px-5 py-3">
                     {l.velocityRisk ? <span className="text-red-400">↓ Dropping</span> : <span className="text-green-400">Stable</span>}
                   </td>
-                  <td className="px-5 py-3 text-white/40">{l.lastActive}</td>
+                  <td className="px-5 py-3 text-gray-400 dark:text-white/40">{l.lastActive}</td>
                 </tr>
               );
             })}

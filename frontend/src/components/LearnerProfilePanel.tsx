@@ -120,6 +120,7 @@ export default function LearnerProfilePanel({ learnerId, cohortId, learnerName, 
                             </div>
 
                             {/* Scores */}
+                            {profile.scores && (
                             <div>
                                 <h3 className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4">Scores</h3>
                                 <div className="space-y-4">
@@ -129,21 +130,25 @@ export default function LearnerProfilePanel({ learnerId, cohortId, learnerName, 
                                                 <span className={color}>{icon}</span>
                                                 <span className="text-sm font-light">{label}</span>
                                             </div>
-                                            <ScoreBar value={profile.scores[key]} color={color} />
+                                            <ScoreBar value={profile.scores[key] ?? 0} color={color} />
                                         </div>
                                     ))}
                                 </div>
                             </div>
+                            )}
 
                             {/* Learning Style */}
+                            {profile.characteristics && (
                             <div>
                                 <h3 className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">Learning Style</h3>
                                 <span className="inline-block px-3 py-1 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-sm font-light">
                                     {profile.characteristics.learning_style}
                                 </span>
                             </div>
+                            )}
 
                             {/* Strengths */}
+                            {profile.characteristics?.strengths?.length > 0 && (
                             <div>
                                 <h3 className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">Strengths</h3>
                                 <div className="flex flex-wrap gap-2">
@@ -154,8 +159,10 @@ export default function LearnerProfilePanel({ learnerId, cohortId, learnerName, 
                                     ))}
                                 </div>
                             </div>
+                            )}
 
                             {/* Struggle Areas */}
+                            {profile.characteristics?.struggle_areas?.length > 0 && (
                             <div>
                                 <h3 className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">Struggle Areas</h3>
                                 <div className="flex flex-wrap gap-2">
@@ -166,22 +173,27 @@ export default function LearnerProfilePanel({ learnerId, cohortId, learnerName, 
                                     ))}
                                 </div>
                             </div>
+                            )}
 
                             {/* Behavioral Pattern */}
+                            {profile.characteristics?.behavioral_pattern && (
                             <div>
                                 <h3 className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Behavioral Pattern</h3>
                                 <p className="text-sm font-light text-gray-700 dark:text-gray-300 leading-relaxed">
                                     {profile.characteristics.behavioral_pattern}
                                 </p>
                             </div>
+                            )}
 
                             {/* Recommended Intervention */}
+                            {profile.characteristics?.recommended_intervention && (
                             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
                                 <h3 className="text-xs uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2">Recommended Action</h3>
                                 <p className="text-sm font-light text-blue-800 dark:text-blue-200 leading-relaxed">
                                     {profile.characteristics.recommended_intervention}
                                 </p>
                             </div>
+                            )}
                         </div>
                     )}
                 </div>

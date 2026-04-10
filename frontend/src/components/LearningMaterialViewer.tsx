@@ -113,17 +113,15 @@ export default function LearningMaterialViewer({
                     setIsLoading(false);
                 })
                 .catch(error => {
-                    // Ignore AbortError as it's expected when navigating away
-                    if (error.name !== 'AbortError') {
-                        console.error("Error fetching task data:", error);
-                    }
+                    if (error.name === 'AbortError') return;
+                    console.error("Error fetching task data:", error);
                     setIsLoading(false);
                 });
 
             // Clean up function will abort the fetch if the component unmounts
             // or if the effect runs again (i.e., taskId changes)
             return () => {
-                controller.abort();
+                controller.abort('cleanup');
             };
         }
     }, [taskId]);

@@ -60,6 +60,10 @@ code_drafts_table_name = "code_drafts"
 integrations_table_name = "integrations"
 bq_sync_table_name = "bq_sync"
 assignment_table_name = "assignment"
+friction_computations_table_name = "friction_computations"
+interventions_table_name = "interventions"
+bandit_weight_history_table_name = "bandit_weight_history"
+agent_briefings_table_name = "agent_briefings"
 
 UPLOAD_FOLDER_NAME = "uploads"
 

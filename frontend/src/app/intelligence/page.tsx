@@ -5,6 +5,8 @@ import CreatorDashboard from "@/components/intelligence/dashboards/CreatorDashbo
 import OperatorDashboard from "@/components/intelligence/dashboards/OperatorDashboard";
 import LearnerDashboard from "@/components/intelligence/dashboards/LearnerDashboard";
 import { DemoModeProvider, useDemoMode } from "@/context/DemoModeContext";
+import { Header } from "@/components/layout/header";
+import { useThemePreference } from "@/lib/hooks/useThemePreference";
 import { GraduationCap, BookOpen, Settings, User } from "lucide-react";
 
 const TABS = [
@@ -20,67 +22,55 @@ function IntelligencePageInner() {
   const [active, setActive] = useState<TabId>("mentor");
   const ActiveDashboard = TABS.find(t => t.id === active)!.component;
   const { demo, setDemo } = useDemoMode();
+  useThemePreference();
 
   return (
-    <div className="min-h-screen bg-[#0f0f0f]">
-      <header className="border-b border-white/5 bg-[#0f0f0f]/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg bg-indigo-500 flex items-center justify-center">
-              <span className="text-white text-xs font-bold">S</span>
-            </div>
-            <div>
-              <span className="text-white font-semibold text-sm">SensAI</span>
-              <span className="text-white/30 text-xs ml-2">Intelligence Platform</span>
-            </div>
+    <div className="min-h-screen bg-white dark:bg-black text-black dark:text-white">
+      <Header showCreateCourseButton={false} />
+
+      <div className="container mx-auto px-4 py-6">
+        {/* Page title + toggle */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-light">Intelligence</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Cohort 1 · Python Bootcamp</p>
           </div>
-          <div className="flex items-center gap-4">
+          <button
+            onClick={() => setDemo(!demo)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium border transition-all ${
+              demo
+                ? "bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30 text-amber-600 dark:text-amber-400"
+                : "bg-green-50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30 text-green-600 dark:text-green-400"
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${demo ? "bg-amber-500" : "bg-green-500 animate-pulse"}`} />
+            {demo ? "Demo Data" : "Live Data"}
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b border-gray-200 dark:border-gray-800 mb-6">
+          {TABS.map(({ id, label, icon: Icon, subtitle }) => (
             <button
-              onClick={() => setDemo(!demo)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-                demo
-                  ? "bg-amber-500/15 border-amber-500/30 text-amber-400"
-                  : "bg-green-500/15 border-green-500/30 text-green-400"
+              key={id}
+              onClick={() => setActive(id)}
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-light border-b-2 transition-all ${
+                active === id
+                  ? "border-black dark:border-white text-black dark:text-white"
+                  : "border-transparent text-gray-400 dark:text-gray-500 hover:text-black dark:hover:text-white"
               }`}
             >
-              <span className={`w-1.5 h-1.5 rounded-full ${demo ? "bg-amber-400" : "bg-green-400 animate-pulse"}`} />
-              {demo ? "Demo Data" : "Live Data"}
+              <Icon className="w-4 h-4" />
+              <div className="text-left">
+                <div>{label}</div>
+                <div className="text-[10px] font-normal opacity-60">{subtitle}</div>
+              </div>
             </button>
-            <div className="flex items-center gap-1 text-xs text-white/30">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-              Live · Cohort 1 · Python Bootcamp
-            </div>
-          </div>
+          ))}
         </div>
-      </header>
 
-      <div className="border-b border-white/5 bg-[#0f0f0f]">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex gap-1">
-            {TABS.map(({ id, label, icon: Icon, subtitle }) => (
-              <button
-                key={id}
-                onClick={() => setActive(id)}
-                className={`flex items-center gap-2 px-5 py-4 text-sm font-medium border-b-2 transition-all ${
-                  active === id
-                    ? "border-indigo-500 text-white"
-                    : "border-transparent text-white/40 hover:text-white/70 hover:border-white/20"
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                <div className="text-left">
-                  <div>{label}</div>
-                  <div className="text-[10px] font-normal opacity-60">{subtitle}</div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <main className="max-w-7xl mx-auto px-6 py-6">
         <ActiveDashboard />
-      </main>
+      </div>
     </div>
   );
 }

@@ -21,6 +21,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function SkillRadarChart({ data }: Props) {
+  if (!data.length) return (
+    <Card>
+      <CardHeader><CardTitle>Skill Mastery Radar</CardTitle></CardHeader>
+      <CardContent><p className="text-xs text-gray-400 dark:text-white/30 py-8 text-center">No skill data available.</p></CardContent>
+    </Card>
+  );
   return (
     <Card>
       <CardHeader>

@@ -193,23 +193,30 @@ async def get_escalation_ladder_signals(cohort_id: int) -> List[Dict]:
     rows = await execute_db_operation(
         f"""
         SELECT
-            ch.user_id,
-            u.first_name, u.last_name,
-            ch.question_id,
-            t.title as task_title,
-            GROUP_CONCAT(ch.response_type ORDER BY ch.created_at) as response_sequence
-        FROM {chat_history_table_name} ch
-        JOIN {users_table_name} u ON ch.user_id = u.id
-        JOIN {questions_table_name} q ON ch.question_id = q.id
-        JOIN {tasks_table_name} t ON q.task_id = t.id
-        JOIN {course_tasks_table_name} ct ON t.id = ct.task_id
-        JOIN {course_cohorts_table_name} cc ON ct.course_id = cc.course_id
-        WHERE cc.cohort_id = ?
-          AND ch.role = 'assistant'
-          AND ch.response_type IS NOT NULL
-          AND ch.deleted_at IS NULL
-          AND q.deleted_at IS NULL
-        GROUP BY ch.user_id, ch.question_id
+            sub.user_id,
+            sub.first_name, sub.last_name,
+            sub.question_id,
+            sub.task_title,
+            GROUP_CONCAT(sub.response_type) as response_sequence
+        FROM (
+            SELECT
+                ch.user_id, u.first_name, u.last_name,
+                ch.question_id, t.title as task_title,
+                ch.response_type
+            FROM {chat_history_table_name} ch
+            JOIN {users_table_name} u ON ch.user_id = u.id
+            JOIN {questions_table_name} q ON ch.question_id = q.id
+            JOIN {tasks_table_name} t ON q.task_id = t.id
+            JOIN {course_tasks_table_name} ct ON t.id = ct.task_id
+            JOIN {course_cohorts_table_name} cc ON ct.course_id = cc.course_id
+            WHERE cc.cohort_id = ?
+              AND ch.role = 'assistant'
+              AND ch.response_type IS NOT NULL
+              AND ch.deleted_at IS NULL
+              AND q.deleted_at IS NULL
+            ORDER BY ch.created_at
+        ) sub
+        GROUP BY sub.user_id, sub.question_id
         HAVING COUNT(*) >= 3
         """,
         (cohort_id,),

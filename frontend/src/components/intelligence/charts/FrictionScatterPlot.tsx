@@ -28,18 +28,24 @@ const CustomTooltip = ({ active, payload }: any) => {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload as LearnerRisk;
   return (
-    <div className="bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-xs shadow-xl">
-      <p className="font-semibold text-white mb-1">{d.name}</p>
-      <p className="text-white/60">Friction: <span className="text-white">{(d.frictionScore * 100).toFixed(0)}%</span></p>
-      <p className="text-white/60">Effort: <span className="text-white">{(d.effortScore * 100).toFixed(0)}%</span></p>
-      <p className="text-white/60 mt-1">Risk: <span className="capitalize text-orange-400">{d.riskLevel}</span></p>
-      {d.reasons.length > 0 && <p className="text-white/40 mt-1 max-w-[160px]">{d.reasons[0]}</p>}
+    <div className="bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/10 rounded-lg p-3 text-xs shadow-xl">
+      <p className="font-semibold text-gray-900 dark:text-white mb-1">{d.name}</p>
+      <p className="text-gray-500 dark:text-white/60">Friction: <span className="text-gray-900 dark:text-white">{(d.frictionScore * 100).toFixed(0)}%</span></p>
+      <p className="text-gray-500 dark:text-white/60">Effort: <span className="text-gray-900 dark:text-white">{(d.effortScore * 100).toFixed(0)}%</span></p>
+      <p className="text-gray-500 dark:text-white/60 mt-1">Risk: <span className="capitalize text-orange-400">{d.riskLevel}</span></p>
+      {d.reasons.length > 0 && <p className="text-gray-400 dark:text-white/40 mt-1 max-w-[160px]">{d.reasons[0]}</p>}
     </div>
   );
 };
 
 export default function FrictionScatterPlot({ learners }: Props) {
   const data = learners.map(l => ({ ...l, x: Math.round(l.effortScore * 100), y: Math.round(l.frictionScore * 100) }));
+  if (!data.length) return (
+    <Card>
+      <CardHeader><CardTitle>Friction vs. Effort</CardTitle></CardHeader>
+      <CardContent><p className="text-xs text-gray-400 dark:text-white/30 py-8 text-center">No learner data available.</p></CardContent>
+    </Card>
+  );
   return (
     <Card>
       <CardHeader>
@@ -62,7 +68,7 @@ export default function FrictionScatterPlot({ learners }: Props) {
             <Scatter data={data} shape={<CustomDot />} />
           </ScatterChart>
         </ResponsiveContainer>
-        <div className="grid grid-cols-2 gap-2 mt-2 text-[10px] text-white/30">
+        <div className="grid grid-cols-2 gap-2 mt-2 text-[10px] text-gray-400 dark:text-white/30">
           <div className="text-right pr-4">← Low effort, high friction (Apathy)</div>
           <div className="pl-4">High effort, high friction (Struggling) →</div>
         </div>

@@ -414,7 +414,7 @@ export default function ClientSchoolAdminView({ id }: { id: string }) {
         } else {
             // Remove hash if it's the courses tab
             if (window.location.hash && typeof window !== 'undefined' && window.history) {
-                history.pushState("", document.title, window.location.pathname);
+                history.pushState(null, document.title, window.location.pathname);
             }
         }
     };

@@ -26,6 +26,13 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function VelocityChart({ data }: Props) {
+  if (!data.length) return (
+    <Card>
+      <CardHeader><CardTitle>Learning Velocity</CardTitle></CardHeader>
+      <CardContent><p className="text-xs text-gray-400 dark:text-white/30 py-8 text-center">No velocity data available.</p></CardContent>
+    </Card>
+  );
+
   const recent = data.slice(-7);
   const recentAvg = recent.reduce((s, d) => s + d.completions, 0) / recent.length;
   const isSlowing = recentAvg < data[0].baseline;

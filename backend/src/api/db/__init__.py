@@ -32,6 +32,10 @@ from api.config import (
     integrations_table_name,
     assignment_table_name,
     bq_sync_table_name,
+    friction_computations_table_name,
+    interventions_table_name,
+    bandit_weight_history_table_name,
+    agent_briefings_table_name,
 )
 from api.db.migration import run_migrations
 
@@ -647,6 +651,62 @@ async def create_code_drafts_table(cursor):
     )
 
 
+async def create_intelligence_tables(cursor):
+    await cursor.execute(
+        f"""CREATE TABLE IF NOT EXISTS {friction_computations_table_name} (
+                id TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                cohort_id INTEGER NOT NULL,
+                task_id INTEGER,
+                arm_id TEXT NOT NULL,
+                friction_score REAL NOT NULL,
+                signals_json TEXT NOT NULL,
+                computed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )"""
+    )
+    await cursor.execute(f"CREATE INDEX IF NOT EXISTS idx_fc_user_id ON {friction_computations_table_name} (user_id)")
+    await cursor.execute(f"CREATE INDEX IF NOT EXISTS idx_fc_cohort_id ON {friction_computations_table_name} (cohort_id)")
+
+    await cursor.execute(
+        f"""CREATE TABLE IF NOT EXISTS {interventions_table_name} (
+                id TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                mentor_id INTEGER NOT NULL,
+                task_id INTEGER,
+                friction_computation_id TEXT NOT NULL,
+                message_sent TEXT NOT NULL,
+                status TEXT NOT NULL,
+                reward_status TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(friction_computation_id) REFERENCES {friction_computations_table_name}(id)
+            )"""
+    )
+
+    await cursor.execute(
+        f"""CREATE TABLE IF NOT EXISTS {bandit_weight_history_table_name} (
+                id TEXT PRIMARY KEY,
+                cohort_id INTEGER NOT NULL,
+                arm_id TEXT NOT NULL,
+                pull_count INTEGER NOT NULL,
+                avg_reward REAL NOT NULL,
+                ucb_score REAL NOT NULL,
+                recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )"""
+    )
+
+    await cursor.execute(
+        f"""CREATE TABLE IF NOT EXISTS {agent_briefings_table_name} (
+                id TEXT PRIMARY KEY,
+                cohort_id INTEGER NOT NULL,
+                role TEXT NOT NULL,
+                briefing_text TEXT NOT NULL,
+                context_json TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )"""
+    )
+
+
 async def init_db():
     # Ensure the database folder exists
     db_folder = os.path.dirname(sqlite_db_path)
@@ -709,6 +769,8 @@ async def init_db():
             await create_assignment_table(cursor)
 
             await create_bq_sync_table(cursor)
+
+            await create_intelligence_tables(cursor)
 
             await conn.commit()
 

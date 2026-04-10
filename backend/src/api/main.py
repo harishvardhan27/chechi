@@ -27,6 +27,7 @@ from api.routes import (
     scorecard,
     integration,
     intelligence,
+    agents,
 )
 
 # from api.routes.ai import (
@@ -99,7 +100,7 @@ async def log_requests(request: Request, call_next):
             f"- Error: {str(e)} - Duration: {process_time:.4f}s",
             exc_info=True,
         )
-        raise
+        return JSONResponse(status_code=500, content={"detail": "An unexpected error occurred"})
 
 
 # Add CORS middleware to allow cross-origin requests (for frontend to access backend)
@@ -136,6 +137,7 @@ app.include_router(hva.router, prefix="/hva", tags=["hva"])
 app.include_router(websocket_router, prefix="/ws", tags=["websockets"])
 app.include_router(integration.router, prefix="/integrations", tags=["integrations"])
 app.include_router(intelligence.router, prefix="/intelligence", tags=["intelligence"])
+app.include_router(agents.router, prefix="/agent", tags=["agents"])
 
 
 @app.exception_handler(Exception)
