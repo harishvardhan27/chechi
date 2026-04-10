@@ -180,10 +180,8 @@ const LearningMaterialEditor = forwardRef<LearningMaterialEditorHandle, Learning
                     setIsLoading(false);
                 })
                 .catch(error => {
-                    // Ignore AbortError as it's expected when navigating away
-                    if (error.name !== 'AbortError') {
-                        console.error("Error fetching task data:", error);
-                    }
+                    if (error.name === 'AbortError') return;
+                    console.error("Error fetching task data:", error);
                     setIsLoading(false);
                 });
 
