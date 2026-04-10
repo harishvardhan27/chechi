@@ -4,6 +4,7 @@ import MentorDashboard from "@/components/intelligence/dashboards/MentorDashboar
 import CreatorDashboard from "@/components/intelligence/dashboards/CreatorDashboard";
 import OperatorDashboard from "@/components/intelligence/dashboards/OperatorDashboard";
 import LearnerDashboard from "@/components/intelligence/dashboards/LearnerDashboard";
+import { DemoModeProvider, useDemoMode } from "@/context/DemoModeContext";
 import { GraduationCap, BookOpen, Settings, User } from "lucide-react";
 
 const TABS = [
@@ -15,9 +16,10 @@ const TABS = [
 
 type TabId = typeof TABS[number]["id"];
 
-export default function IntelligencePage() {
+function IntelligencePageInner() {
   const [active, setActive] = useState<TabId>("mentor");
   const ActiveDashboard = TABS.find(t => t.id === active)!.component;
+  const { demo, setDemo } = useDemoMode();
 
   return (
     <div className="min-h-screen bg-[#0f0f0f]">
@@ -32,9 +34,22 @@ export default function IntelligencePage() {
               <span className="text-white/30 text-xs ml-2">Intelligence Platform</span>
             </div>
           </div>
-          <div className="flex items-center gap-1 text-xs text-white/30">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-            Live · Cohort 1 · Python Bootcamp
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setDemo(!demo)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                demo
+                  ? "bg-amber-500/15 border-amber-500/30 text-amber-400"
+                  : "bg-green-500/15 border-green-500/30 text-green-400"
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${demo ? "bg-amber-400" : "bg-green-400 animate-pulse"}`} />
+              {demo ? "Demo Data" : "Live Data"}
+            </button>
+            <div className="flex items-center gap-1 text-xs text-white/30">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+              Live · Cohort 1 · Python Bootcamp
+            </div>
           </div>
         </div>
       </header>
@@ -67,5 +82,13 @@ export default function IntelligencePage() {
         <ActiveDashboard />
       </main>
     </div>
+  );
+}
+
+export default function IntelligencePage() {
+  return (
+    <DemoModeProvider>
+      <IntelligencePageInner />
+    </DemoModeProvider>
   );
 }

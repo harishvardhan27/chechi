@@ -1,21 +1,57 @@
 "use client";
+import { useEffect, useState } from "react";
 import TimeToInterventionChart from "@/components/intelligence/charts/TimeToInterventionChart";
 import SystemAccuracyChart from "@/components/intelligence/charts/SystemAccuracyChart";
 import { mockInterventionTimings as TIMING_DATA, mockAccuracySlices as ACCURACY_DATA, mockInterventions as INTERVENTIONS } from "@/lib/intelligenceMockData";
+import { useDemoMode } from "@/context/DemoModeContext";
+import type { Intervention } from "@/types/intelligence";
 import { Activity, CheckCircle, Clock } from "lucide-react";
 
-const totalInterventions = INTERVENTIONS.length;
-const resolved = INTERVENTIONS.filter(i => i.outcome === "positive").length;
-const avgDays = INTERVENTIONS.filter(i => i.daysToResolve).reduce((s, i) => s + (i.daysToResolve ?? 0), 0) / resolved;
+const COHORT_ID = 10;
 
 export default function OperatorDashboard() {
+  const { demo } = useDemoMode();
+  const [interventions, setInterventions] = useState<Intervention[]>(INTERVENTIONS);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (demo) { setInterventions(INTERVENTIONS); return; }
+    setLoading(true);
+    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/cohort/${COHORT_ID}/signals`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data) return;
+        // Map individual_issues signals → Intervention[]
+        const mapped: Intervention[] = (data.individual_issues ?? []).flatMap((learner: any) =>
+          (learner.signals ?? []).map((s: any, i: number) => ({
+            id: learner.user_id * 100 + i,
+            learnerName: learner.user_name,
+            actionType: s.signal,
+            sentAt: s.session_date ?? s.last_seen ?? s.last_active ?? "recently",
+            outcome: "pending" as const,
+            daysToResolve: null,
+          }))
+        );
+        if (mapped.length) setInterventions(mapped);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [demo]);
+
+  const totalInterventions = interventions.length;
+  const resolved = interventions.filter(i => i.outcome === "positive").length;
+  const avgDays = resolved > 0
+    ? interventions.filter(i => i.daysToResolve).reduce((s, i) => s + (i.daysToResolve ?? 0), 0) / resolved
+    : 0;
+
   return (
     <div className="space-y-6">
+      {loading && <div className="text-xs text-white/30 text-center py-2">Fetching live data…</div>}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Total Interventions", value: totalInterventions,        icon: Activity,    color: "text-indigo-400", bg: "bg-indigo-500/10 border-indigo-500/20" },
-          { label: "Resolved (7 days)",   value: resolved,                  icon: CheckCircle, color: "text-green-400",  bg: "bg-green-500/10 border-green-500/20" },
-          { label: "Avg Days to Resolve", value: `${avgDays.toFixed(1)}d`,  icon: Clock,       color: "text-amber-400",  bg: "bg-amber-500/10 border-amber-500/20" },
+          { label: "Total Interventions", value: totalInterventions,       icon: Activity,    color: "text-indigo-400", bg: "bg-indigo-500/10 border-indigo-500/20" },
+          { label: "Resolved (7 days)",   value: resolved,                 icon: CheckCircle, color: "text-green-400",  bg: "bg-green-500/10 border-green-500/20" },
+          { label: "Avg Days to Resolve", value: `${avgDays.toFixed(1)}d`, icon: Clock,       color: "text-amber-400",  bg: "bg-amber-500/10 border-amber-500/20" },
         ].map(({ label, value, icon: Icon, color, bg }) => (
           <div key={label} className={`rounded-xl border p-4 flex items-center gap-3 ${bg}`}>
             <Icon className={`w-5 h-5 ${color}`} />
@@ -45,7 +81,7 @@ export default function OperatorDashboard() {
               </tr>
             </thead>
             <tbody>
-              {INTERVENTIONS.map(iv => (
+              {interventions.slice(0, 20).map(iv => (
                 <tr key={iv.id} className="border-b border-white/5 last:border-0">
                   <td className="py-2.5 text-white/80">{iv.learnerName}</td>
                   <td className="py-2.5 text-white/50 capitalize">{iv.actionType.replace(/_/g, " ")}</td>
