@@ -1,0 +1,26 @@
+# Python
+**/.venv/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/src/db/db.sqlite
+**/src/logs/
+**/uploads/
+
+# Node / Next.js
+**/node_modules/
+**/.next/
+**/dist/
+**/build/
+
+# Secrets / env
+**/.env
+**/.env.local
+**/.env.aws
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+exclude.txt
