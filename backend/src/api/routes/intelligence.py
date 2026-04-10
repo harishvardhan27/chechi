@@ -627,6 +627,159 @@ async def _build_learner_context(learner_id: int, cohort_id: int) -> str:
     return "\n".join(lines)
 
 
+# ---------------------------------------------------------------------------
+# Bandit state + learner RL scores
+# ---------------------------------------------------------------------------
+
+@router.get("/bandit/{cohort_id}/state")
+async def get_bandit_state(cohort_id: int):
+    """Returns UCB1 bandit state for a cohort — arm rewards, pull counts, best arm."""
+    from api.bandit import UCB1Bandit, BANDIT_ARMS
+    from api.config import bandit_weight_history_table_name
+
+    bandit = UCB1Bandit(cohort_id)
+    state = await bandit.get_state()
+
+    arms = []
+    for arm_id, data in state.items():
+        weights = BANDIT_ARMS[arm_id].model_dump() if arm_id in BANDIT_ARMS else {}
+        arms.append({
+            "arm_name": arm_id,
+            "pull_count": data["pull_count"],
+            "avg_reward": round(data["avg_reward"], 4),
+            "ucb_score": round(data["ucb_score"], 4) if data["ucb_score"] != float("inf") else None,
+            "weights": weights,
+        })
+
+    pulled = [a for a in arms if a["pull_count"] > 0]
+    best_arm = max(pulled, key=lambda a: a["avg_reward"])["arm_name"] if pulled else None
+    total_rounds = sum(a["pull_count"] for a in arms)
+
+    return {
+        "cohort_id": cohort_id,
+        "arms": arms,
+        "best_arm": best_arm,
+        "total_rounds": total_rounds,
+        "exploration_phase": len(pulled) < len(arms),
+    }
+
+
+@router.get("/bandit/{cohort_id}/learner-scores")
+async def get_learner_rl_scores(cohort_id: int):
+    """Returns RL-derived scores for all learners in a cohort."""
+    from api.config import friction_computations_table_name, interventions_table_name
+
+    learners = await execute_db_operation(
+        f"""
+        SELECT u.id, u.first_name, u.last_name, u.email
+        FROM {users_table_name} u
+        JOIN {user_cohorts_table_name} uc ON u.id = uc.user_id
+        WHERE uc.cohort_id = ? AND uc.role = 'learner'
+          AND uc.deleted_at IS NULL AND u.deleted_at IS NULL
+        """,
+        (cohort_id,),
+        fetch_all=True,
+    )
+
+    result = []
+    for row in learners:
+        uid, first, last, email = row
+        name = f"{first or ''} {last or ''}".strip() or email
+
+        # avg friction score from friction_computations
+        fc_row = await execute_db_operation(
+            f"""
+            SELECT AVG(friction_score), COUNT(*)
+            FROM {friction_computations_table_name}
+            WHERE user_id = ? AND cohort_id = ?
+            """,
+            (uid, cohort_id),
+            fetch_one=True,
+        )
+        avg_friction = round(fc_row[0] or 0.0, 3)
+        compute_count = fc_row[1] or 0
+
+        # positive outcomes from interventions
+        iv_row = await execute_db_operation(
+            f"""
+            SELECT COUNT(*)
+            FROM {interventions_table_name}
+            WHERE user_id = ? AND reward_status = 'positive'
+            """,
+            (uid,),
+            fetch_one=True,
+        )
+        positive_outcomes = iv_row[0] if iv_row else 0
+
+        # avg reward from interventions
+        avg_reward_row = await execute_db_operation(
+            f"""
+            SELECT AVG(CASE reward_status WHEN 'positive' THEN 1.0 WHEN 'negative' THEN -1.0 ELSE 0.0 END)
+            FROM {interventions_table_name}
+            WHERE user_id = ?
+            """,
+            (uid,),
+            fetch_one=True,
+        )
+        avg_reward = round(avg_reward_row[0], 3) if avg_reward_row and avg_reward_row[0] is not None else None
+
+        # RL score: 100 - friction*60 + positive_outcomes*10, clamped [0,100]
+        rl_score = max(0, min(100, round(100 - avg_friction * 60 + positive_outcomes * 10)))
+
+        result.append({
+            "learner_id": uid,
+            "name": name,
+            "email": email,
+            "avg_friction": avg_friction,
+            "compute_count": compute_count,
+            "positive_outcomes": positive_outcomes,
+            "avg_reward": avg_reward,
+            "rl_score": rl_score,
+        })
+
+    return {"cohort_id": cohort_id, "learners": result}
+
+
+class ProcessRewardsRequest(BaseModel):
+    demo_mode: bool = False
+
+
+@router.post("/bandit/{cohort_id}/process-rewards")
+async def process_bandit_rewards(cohort_id: int, request: ProcessRewardsRequest):
+    """Process pending friction computations as bandit rewards."""
+    from api.bandit import UCB1Bandit
+    from api.config import friction_computations_table_name
+    import random
+
+    bandit = UCB1Bandit(cohort_id)
+
+    # Fetch unprocessed friction computations for this cohort
+    rows = await execute_db_operation(
+        f"""
+        SELECT id, arm_id, friction_score
+        FROM {friction_computations_table_name}
+        WHERE cohort_id = ?
+        ORDER BY computed_at DESC
+        LIMIT 20
+        """,
+        (cohort_id,),
+        fetch_all=True,
+    )
+
+    processed = 0
+    for row in rows:
+        fc_id, arm_id, friction_score = row
+        # reward = inverse of friction (lower friction = better arm)
+        if request.demo_mode:
+            reward = round(random.uniform(-0.3, 1.0), 2)
+        else:
+            reward = round(1.0 - friction_score, 3)
+        await bandit.update_reward(arm_id, reward)
+        processed += 1
+
+    return {"cohort_id": cohort_id, "processed": processed}
+
+
 @router.get("/learner/{learner_id}/profile")
 async def get_learner_profile(learner_id: int, cohort_id: int):
     """

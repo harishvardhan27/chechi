@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { AlertTriangle, TrendingDown, User, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
+import { AlertTriangle, TrendingDown, User, ChevronDown, ChevronUp, Sparkles, Brain, RefreshCw } from "lucide-react";
 import LearnerProfilePanel from "@/components/LearnerProfilePanel";
+
 
 interface RecommendedAction {
     action_type: string;
@@ -173,6 +174,9 @@ export default function CohortIntelligence({ cohortId }: CohortIntelligenceProps
     const [loadingInsights, setLoadingInsights] = useState(true);
     const [errorBriefing, setErrorBriefing] = useState<string | null>(null);
     const [errorInsights, setErrorInsights] = useState<string | null>(null);
+    const [bandit, setBandit] = useState<any>(null);
+    const [processingRewards, setProcessingRewards] = useState(false);
+    const [rlLeaderboard, setRlLeaderboard] = useState<any[]>([]);
 
     useEffect(() => {
         setLoadingBriefing(true);
@@ -227,7 +231,35 @@ export default function CohortIntelligence({ cohortId }: CohortIntelligenceProps
             })
             .catch(e => setErrorInsights(e.message))
             .finally(() => setLoadingInsights(false));
+
+        // Fetch bandit state
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/bandit/${cohortId}/state`)
+            .then(r => r.ok ? r.json() : null)
+            .then(data => { if (data) setBandit(data); })
+            .catch(() => {});
+
+        // Fetch RL learner scores
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/bandit/${cohortId}/learner-scores`)
+            .then(r => r.ok ? r.json() : null)
+            .then(data => { if (data?.learners) setRlLeaderboard(data.learners); })
+            .catch(() => {});
     }, [cohortId]);
+
+    const handleProcessRewards = () => {
+        setProcessingRewards(true);
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/bandit/${cohortId}/process-rewards`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ demo_mode: true }),
+        })
+            .then(r => r.ok ? r.json() : null)
+            .then(() => Promise.all([
+                fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/bandit/${cohortId}/state`).then(r => r.json()).then(setBandit),
+                fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/bandit/${cohortId}/learner-scores`).then(r => r.json()).then(d => setRlLeaderboard(d.learners ?? [])),
+            ]))
+            .catch(() => {})
+            .finally(() => setProcessingRewards(false));
+    };
 
     return (
         <div className="space-y-10">
@@ -334,6 +366,220 @@ export default function CohortIntelligence({ cohortId }: CohortIntelligenceProps
                     </div>
                 )}
             </section>
+
+            {/* ── RL Bandit State ── */}
+            <section>
+                <div className="flex items-center gap-2 mb-1">
+                    <span className="w-2 h-2 rounded-full bg-purple-400" />
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">RL weight learning</h3>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 ml-4">
+                    UCB1 bandit exploring 16 weight configurations. Bars show which theory of learner struggle is most predictive for this cohort.
+                </p>
+
+                {bandit ? (
+                    <div className="space-y-0">
+                        {/* Converged header row */}
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-purple-400">✦</span>
+                                    <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                                        {bandit.exploration_phase ? "Exploring…" : `Converged → ${bandit.best_arm}`}
+                                    </span>
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 ml-5">
+                                    {bandit.total_rounds ?? 0} total rounds · {bandit.arms?.filter((a: any) => a.pull_count > 0).length ?? 0}/{bandit.arms?.length ?? 16} arms tried
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={handleProcessRewards}
+                                    disabled={processingRewards}
+                                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+                                >
+                                    <RefreshCw size={11} className={processingRewards ? "animate-spin" : ""} />
+                                    Process rewards
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        // simulate 5 rounds by calling process-rewards 5 times
+                                        setProcessingRewards(true);
+                                        const calls = Array.from({ length: 5 }, () =>
+                                            fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/bandit/${cohortId}/process-rewards`, {
+                                                method: "POST", headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({ demo_mode: true }),
+                                            })
+                                        );
+                                        Promise.all(calls)
+                                            .then(() => Promise.all([
+                                                fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/bandit/${cohortId}/state`).then(r => r.json()).then(setBandit),
+                                                fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/bandit/${cohortId}/learner-scores`).then(r => r.json()).then(d => setRlLeaderboard(d.learners ?? [])),
+                                            ]))
+                                            .catch(() => {})
+                                            .finally(() => setProcessingRewards(false));
+                                    }}
+                                    disabled={processingRewards}
+                                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-purple-600 hover:bg-purple-500 text-white transition-colors disabled:opacity-50"
+                                >
+                                    ▶ Simulate 5 rounds
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Horizontal bar chart — all arms */}
+                        <div className="space-y-[3px]">
+                            {(bandit.arms ?? []).map((arm: any) => {
+                                const reward = arm.avg_reward ?? 0;
+                                const isBest = arm.arm_name === bandit.best_arm;
+                                const pulled = arm.pull_count > 0;
+                                // bar color by reward value
+                                const barColor = reward >= 0.7 ? "#ec4899" : reward >= 0.4 ? "#3b82f6" : reward >= 0 ? "#eab308" : "#f97316";
+                                // bar width: map [-1,1] → [0,100]%
+                                const barPct = Math.max(0, Math.min(100, ((reward + 1) / 2) * 100));
+                                return (
+                                    <div key={arm.arm_name} className="flex items-center gap-3 group">
+                                        <div className={`w-36 text-right text-xs flex-shrink-0 flex items-center justify-end gap-1 ${
+                                            isBest ? "text-pink-400 font-semibold" : "text-gray-500 dark:text-gray-400"
+                                        }`}>
+                                            {isBest && <span className="text-pink-400">★</span>}
+                                            {arm.arm_name}
+                                        </div>
+                                        <div className="flex-1 h-5 bg-gray-100 dark:bg-[#1e1e2e] rounded-sm overflow-hidden">
+                                            {pulled ? (
+                                                <div
+                                                    className="h-full rounded-sm transition-all duration-500"
+                                                    style={{ width: `${barPct}%`, background: barColor }}
+                                                />
+                                            ) : (
+                                                <div className="h-full w-full flex items-center px-2">
+                                                    <span className="text-[10px] text-gray-400 dark:text-gray-600">not tried</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="w-20 text-right text-xs flex-shrink-0 text-gray-400 dark:text-gray-500">
+                                            {pulled ? `${reward >= 0 ? "+" : ""}${reward.toFixed(2)} (${arm.pull_count}×)` : "—"}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Legend */}
+                        <div className="flex items-center gap-4 mt-4 text-[10px]">
+                            {[
+                                { color: "#ec4899", label: "reward ≥ 0.7" },
+                                { color: "#3b82f6", label: "0.4–0.7" },
+                                { color: "#eab308", label: "0–0.4" },
+                                { color: "#f97316", label: "negative" },
+                            ].map(({ color, label }) => (
+                                <div key={label} className="flex items-center gap-1">
+                                    <span className="w-2 h-2 rounded-full inline-block" style={{ background: color }} />
+                                    <span className="text-gray-500 dark:text-gray-400">{label}</span>
+                                </div>
+                            ))}
+                        </div>
+
+
+
+                        {/* Best arm weights */}
+                        {bandit.best_arm && (() => {
+                            const bestArm = bandit.arms?.find((a: any) => a.arm_name === bandit.best_arm);
+                            const weights = bestArm?.weights ?? {};
+                            const weightEntries = Object.entries(weights);
+                            if (!weightEntries.length) return null;
+                            return (
+                                <div className="mt-4 bg-[#0d0d1a] dark:bg-[#0d0d1a] border border-purple-900/40 rounded-xl p-4">
+                                    <p className="text-xs font-semibold text-gray-300 mb-2">Best arm weights: {bandit.best_arm}</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {weightEntries.map(([k, v]: any) => (
+                                            <span key={k} className="text-xs px-2 py-1 rounded-full bg-purple-900/30 border border-purple-700/40 text-purple-300">
+                                                {k.replace("w_", "").charAt(0).toUpperCase() + k.replace("w_", "").slice(1)} {(v * 100).toFixed(0)}%
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                    </div>
+                ) : (
+                    <div className="border border-gray-200 dark:border-gray-800 rounded-xl p-8 text-center">
+                        <Brain size={24} className="text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                        <p className="text-sm text-gray-500 dark:text-gray-400">No bandit data yet. Friction scores will populate this as learners interact.</p>
+                    </div>
+                )}
+            </section>
+
+            {/* ── RL Learner Leaderboard ── */}
+            {rlLeaderboard.length > 0 && (
+                <section>
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="w-2 h-2 rounded-full bg-green-400" />
+                        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Learner RL leaderboard</h3>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 ml-4">
+                        Ranked by RL score — lower score = higher friction, needs attention first
+                    </p>
+                    <div className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+                        <div className="grid grid-cols-[2rem_1fr_9rem_7rem_7rem_5rem] px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 text-[11px] text-gray-400 dark:text-gray-500 font-medium">
+                            <span>#</span>
+                            <span>Learner</span>
+                            <span>RL Score</span>
+                            <span>Friction</span>
+                            <span>Avg Reward</span>
+                            <span className="text-right">Outcomes</span>
+                        </div>
+                        {[...rlLeaderboard]
+                            .sort((a, b) => b.rl_score - a.rl_score)
+                            .map((l, i, arr) => {
+                                const scoreColor = l.rl_score >= 80 ? "#22c55e" : l.rl_score >= 60 ? "#3b82f6" : l.rl_score >= 40 ? "#eab308" : "#ef4444";
+                                const frictionPct = Math.round((l.avg_friction ?? 0) * 100);
+                                const frictionColor = frictionPct >= 50 ? "#ef4444" : frictionPct >= 25 ? "#f59e0b" : "#22c55e";
+                                const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : String(i + 1);
+                                const isWorst = i === arr.length - 1;
+                                return (
+                                    <div
+                                        key={l.learner_id}
+                                        className={`grid grid-cols-[2rem_1fr_9rem_7rem_7rem_5rem] px-4 py-3 border-b border-gray-100 dark:border-gray-800 last:border-0 text-xs transition-colors ${
+                                            isWorst ? "bg-red-50/40 dark:bg-red-900/10" : "hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                                        }`}
+                                    >
+                                        <span className="flex items-center text-gray-400 dark:text-gray-500">{medal}</span>
+                                        <div className="flex flex-col justify-center min-w-0 pr-2">
+                                            <span className={`font-medium truncate ${
+                                                isWorst ? "text-red-500 dark:text-red-400" : "text-gray-900 dark:text-white/90"
+                                            }`}>{l.name || l.email}</span>
+                                            <span className="text-[10px] text-gray-400 dark:text-gray-600 truncate">{l.email}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 pr-2">
+                                            <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
+                                                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(100, l.rl_score)}%`, background: scoreColor }} />
+                                            </div>
+                                            <span className="font-semibold w-6 text-right flex-shrink-0" style={{ color: scoreColor }}>{l.rl_score}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 pr-2">
+                                            <div className="w-10 h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
+                                                <div className="h-full rounded-full" style={{ width: `${frictionPct}%`, background: frictionColor }} />
+                                            </div>
+                                            <span style={{ color: frictionColor }}>{frictionPct}%</span>
+                                        </div>
+                                        <span className="flex items-center">
+                                            {l.avg_reward != null
+                                                ? <span className={l.avg_reward >= 0 ? "text-green-500" : "text-red-400"}>{l.avg_reward >= 0 ? "+" : ""}{l.avg_reward.toFixed(2)}</span>
+                                                : <span className="text-gray-400">—</span>}
+                                        </span>
+                                        <div className="flex items-center justify-end">
+                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                                                {l.positive_outcomes ?? 0} ✓
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        }
+                    </div>
+                </section>
+            )}
         </div>
     );
 }
