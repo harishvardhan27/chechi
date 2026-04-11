@@ -221,6 +221,52 @@ async def seed_dynamic(conn):
     cursor = await conn.cursor()
     rng = random.Random(42)  # deterministic
 
+    # Ensure intelligence tables exist (DB may predate them)
+    await cursor.execute("""
+        CREATE TABLE IF NOT EXISTS friction_computations (
+            id TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            cohort_id INTEGER NOT NULL,
+            task_id INTEGER,
+            arm_id TEXT NOT NULL,
+            friction_score REAL NOT NULL,
+            signals_json TEXT NOT NULL,
+            computed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""")
+    await cursor.execute("""
+        CREATE TABLE IF NOT EXISTS interventions (
+            id TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            mentor_id INTEGER NOT NULL,
+            task_id INTEGER,
+            friction_computation_id TEXT NOT NULL,
+            message_sent TEXT NOT NULL,
+            status TEXT NOT NULL,
+            reward_status TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""")
+    await cursor.execute("""
+        CREATE TABLE IF NOT EXISTS bandit_weight_history (
+            id TEXT PRIMARY KEY,
+            cohort_id INTEGER NOT NULL,
+            arm_id TEXT NOT NULL,
+            pull_count INTEGER NOT NULL,
+            avg_reward REAL NOT NULL,
+            ucb_score REAL NOT NULL,
+            recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""")
+    await cursor.execute("""
+        CREATE TABLE IF NOT EXISTS agent_briefings (
+            id TEXT PRIMARY KEY,
+            cohort_id INTEGER NOT NULL,
+            role TEXT NOT NULL,
+            briefing_text TEXT NOT NULL,
+            context_json TEXT NOT NULL,
+            status TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""")
+    await conn.commit()
+
     # -----------------------------------------------------------------------
     # 1. Task completions
     # -----------------------------------------------------------------------
