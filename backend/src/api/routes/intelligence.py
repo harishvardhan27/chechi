@@ -239,7 +239,7 @@ async def _cached_mentor_briefing(cohort_id: int):
 
     Cached for 60 seconds.
     """
-    at_risk = await get_top_at_risk_learners(cohort_id, top_n=5)
+    at_risk = await get_top_at_risk_learners(cohort_id, min_friction=0.6)
 
     if not at_risk:
         return {

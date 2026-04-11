@@ -484,10 +484,10 @@ async def build_mentor_preread(learner_id: int, cohort_id: int) -> Dict:
 # Cohort-level: top at-risk learners with friction scores
 # ---------------------------------------------------------------------------
 
-async def get_top_at_risk_learners(cohort_id: int, top_n: int = 5) -> List[Dict]:
+async def get_top_at_risk_learners(cohort_id: int, min_friction: float = 0.6) -> List[Dict]:
     """
-    Returns top N at-risk learners in a cohort, ranked by friction score
-    across their most-struggled task.
+    Returns at-risk learners in a cohort whose friction score exceeds the minimum threshold.
+    Ranked by friction score.
     """
     # Get all learners
     learners = await execute_db_operation(
@@ -545,7 +545,7 @@ async def get_top_at_risk_learners(cohort_id: int, top_n: int = 5) -> List[Dict]
         })
 
     results.sort(key=lambda x: x["friction_score"], reverse=True)
-    return results[:top_n]
+    return [r for r in results if r["friction_score"] >= min_friction]
 
 
 # ---------------------------------------------------------------------------

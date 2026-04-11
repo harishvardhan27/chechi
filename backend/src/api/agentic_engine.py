@@ -66,7 +66,7 @@ async def draft_mentor_briefing(cohort_id: int) -> List[Dict]:
     """Generates the Action Feed for the Mentor Copilot."""
     
     # 1. Find the struggling students mathematically using RL-validated friction
-    top_learners = await get_top_at_risk_learners(cohort_id, top_n=5)
+    top_learners = await get_top_at_risk_learners(cohort_id, min_friction=0.6)
     
     if not top_learners:
         return []
