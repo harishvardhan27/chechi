@@ -23,7 +23,7 @@ Open http://localhost:8001/docs
 ## intelligence
 
 ### GET `/intelligence/mentor/{cohort_id}/briefing`
-Top 5 at-risk learners — friction score, risk level, reasons, velocity risk, recommended action.
+Top 5 at-risk learners — friction score, risk level, reasons, velocity risk, recommended action, and a deterministic template-fill `explanation` string defining why the user was flagged.
 
 Swagger params: `cohort_id = 10`
 ```bash

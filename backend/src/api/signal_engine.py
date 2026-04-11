@@ -541,7 +541,65 @@ async def get_top_at_risk_learners(cohort_id: int, top_n: int = 5) -> List[Dict]
             "confidence": friction["confidence"],
             "velocity_risk": velocity["velocity_risk"],
             "top_struggle_task_id": task_id,
+            "explanation": await generate_alert_explanation(uid, first, task_id, cohort_id, friction),
         })
 
     results.sort(key=lambda x: x["friction_score"], reverse=True)
     return results[:top_n]
+
+
+# ---------------------------------------------------------------------------
+# Feature: Explanation Generator
+# ---------------------------------------------------------------------------
+
+async def generate_alert_explanation(
+    learner_id: int, learner_name: str, task_id: int, cohort_id: int, friction: Dict
+) -> str:
+    """
+    Generates a deterministic, human-readable template explanation for friction alerts.
+    """
+    task_row = await execute_db_operation(
+        f"SELECT title FROM {tasks_table_name} WHERE id = ?",
+        (task_id,),
+        fetch_one=True
+    )
+    task_title = task_row[0] if task_row else f"Task {task_id}"
+
+    learner_attempts = friction.get("raw", {}).get("attempts", 0)
+    max_attempts = await _get_dynamic_attempt_threshold(task_id)
+    cohort_median = max(1, round(max_attempts / 2.0))
+
+    chat_turns = friction.get("raw", {}).get("chat_turns", 0)
+    
+    avg_score = friction.get("raw", {}).get("avg_score_pct")
+    score_val = avg_score if avg_score is not None else 0
+
+    score_row = await execute_db_operation(
+        f"""
+        SELECT AVG(score) FROM (
+            SELECT CAST(COUNT(tc.id) AS FLOAT) / (SELECT MAX(q_count) FROM (SELECT COUNT(*) as q_count FROM {questions_table_name} WHERE task_id = ?)) as score
+            FROM {task_completions_table_name} tc
+            WHERE tc.task_id = ?
+            GROUP BY tc.user_id
+        )
+        """,
+        (task_id, task_id),
+        fetch_one=True
+    )
+    cohort_avg_score = round((score_row[0] or 0.0) * 100) if score_row else 0
+
+    classification = await classify_signal(task_id, cohort_id)
+    is_individual = classification.get("classification") == "individual"
+    struggle_type = "individual struggle rather than a content issue" if is_individual else "content issue rather than an individual struggle"
+    completion_rate = round(100 - classification.get("stuck_pct", 0), 1)
+
+    name = str(learner_name).strip() if learner_name else "The learner"
+    
+    explanation = (
+        f"{name} has attempted {task_title} {learner_attempts} times (cohort median: {cohort_median}). "
+        f"Their recent chat sessions accumulated {chat_turns} turns with no successful submission. "
+        f"Their module score was {score_val}% (cohort average: {cohort_avg_score}%). "
+        f"The system flagged this as an {struggle_type} because {completion_rate}% of the cohort completed this task within {cohort_median} attempts."
+    )
+    
+    return explanation

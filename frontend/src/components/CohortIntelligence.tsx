@@ -236,13 +236,13 @@ export default function CohortIntelligence({ cohortId }: CohortIntelligenceProps
         fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/bandit/${cohortId}/state`)
             .then(r => r.ok ? r.json() : null)
             .then(data => { if (data) setBandit(data); })
-            .catch(() => {});
+            .catch(() => { });
 
         // Fetch RL learner scores
         fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/bandit/${cohortId}/learner-scores`)
             .then(r => r.ok ? r.json() : null)
             .then(data => { if (data?.learners) setRlLeaderboard(data.learners); })
-            .catch(() => {});
+            .catch(() => { });
     }, [cohortId]);
 
     const handleProcessRewards = () => {
@@ -257,7 +257,7 @@ export default function CohortIntelligence({ cohortId }: CohortIntelligenceProps
                 fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/bandit/${cohortId}/state`).then(r => r.json()).then(setBandit),
                 fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/bandit/${cohortId}/learner-scores`).then(r => r.json()).then(d => setRlLeaderboard(d.learners ?? [])),
             ]))
-            .catch(() => {})
+            .catch(() => { })
             .finally(() => setProcessingRewards(false));
     };
 
@@ -416,7 +416,7 @@ export default function CohortIntelligence({ cohortId }: CohortIntelligenceProps
                                                 fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/bandit/${cohortId}/state`).then(r => r.json()).then(setBandit),
                                                 fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/bandit/${cohortId}/learner-scores`).then(r => r.json()).then(d => setRlLeaderboard(d.learners ?? [])),
                                             ]))
-                                            .catch(() => {})
+                                            .catch(() => { })
                                             .finally(() => setProcessingRewards(false));
                                     }}
                                     disabled={processingRewards}
@@ -439,9 +439,8 @@ export default function CohortIntelligence({ cohortId }: CohortIntelligenceProps
                                 const barPct = Math.max(0, Math.min(100, ((reward + 1) / 2) * 100));
                                 return (
                                     <div key={arm.arm_name} className="flex items-center gap-3 group">
-                                        <div className={`w-36 text-right text-xs flex-shrink-0 flex items-center justify-end gap-1 ${
-                                            isBest ? "text-pink-400 font-semibold" : "text-gray-500 dark:text-gray-400"
-                                        }`}>
+                                        <div className={`w-36 text-right text-xs flex-shrink-0 flex items-center justify-end gap-1 ${isBest ? "text-pink-400 font-semibold" : "text-gray-500 dark:text-gray-400"
+                                            }`}>
                                             {isBest && <span className="text-pink-400">★</span>}
                                             {arm.arm_name}
                                         </div>
@@ -540,15 +539,13 @@ export default function CohortIntelligence({ cohortId }: CohortIntelligenceProps
                                 return (
                                     <div
                                         key={l.learner_id}
-                                        className={`grid grid-cols-[2rem_1fr_9rem_7rem_7rem_5rem] px-4 py-3 border-b border-gray-100 dark:border-gray-800 last:border-0 text-xs transition-colors ${
-                                            isWorst ? "bg-red-50/40 dark:bg-red-900/10" : "hover:bg-gray-50 dark:hover:bg-white/[0.02]"
-                                        }`}
+                                        className={`grid grid-cols-[2rem_1fr_9rem_7rem_7rem_5rem] px-4 py-3 border-b border-gray-100 dark:border-gray-800 last:border-0 text-xs transition-colors ${isWorst ? "bg-red-50/40 dark:bg-red-900/10" : "hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                                            }`}
                                     >
                                         <span className="flex items-center text-gray-400 dark:text-gray-500">{medal}</span>
                                         <div className="flex flex-col justify-center min-w-0 pr-2">
-                                            <span className={`font-medium truncate ${
-                                                isWorst ? "text-red-500 dark:text-red-400" : "text-gray-900 dark:text-white/90"
-                                            }`}>{l.name || l.email}</span>
+                                            <span className={`font-medium truncate ${isWorst ? "text-red-500 dark:text-red-400" : "text-gray-900 dark:text-white/90"
+                                                }`}>{l.name || l.email}</span>
                                             <span className="text-[10px] text-gray-400 dark:text-gray-600 truncate">{l.email}</span>
                                         </div>
                                         <div className="flex items-center gap-2 pr-2">

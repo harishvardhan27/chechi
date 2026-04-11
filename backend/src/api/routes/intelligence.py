@@ -262,6 +262,7 @@ async def _cached_mentor_briefing(cohort_id: int):
             "confidence": learner["confidence"],
             "velocity_risk": learner["velocity_risk"],
             "recommended_action": action,
+            "explanation": learner.get("explanation", ""),
         })
 
     return {
