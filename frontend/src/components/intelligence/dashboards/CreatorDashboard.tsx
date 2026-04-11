@@ -9,9 +9,11 @@ import { useDemoMode } from "@/context/DemoModeContext";
 import type { RubricCell, FunnelStage, ConfusionTopic } from "@/types/intelligence";
 import { BookOpen, TrendingDown, MessageSquare, Sparkles, AlertTriangle, Users, ArrowRight, Layers } from "lucide-react";
 
-const COURSE_ID = "20";
+interface Props {
+  cohortId?: string | number;
+}
 
-export default function CreatorDashboard() {
+export default function CreatorDashboard({ cohortId = "20" }: Props) {
   const { demo } = useDemoMode();
   const [rubric, setRubric] = useState<RubricCell[]>([]);
   const [funnel, setFunnel] = useState<FunnelStage[]>([]);
@@ -27,7 +29,7 @@ export default function CreatorDashboard() {
       setLoading(false); return;
     }
     setLoading(true);
-    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/creator/${COURSE_ID}/signals`)
+    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/creator/${cohortId}/signals`)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (!data) return;
@@ -51,7 +53,7 @@ export default function CreatorDashboard() {
         }
       })
       .catch(console.error).finally(() => setLoading(false));
-  }, [demo]);
+  }, [demo, cohortId]);
 
   const systemicTasks = [...new Set(rubric.filter(d => d.weaknessPct >= 75).map(d => d.taskTitle))].length;
   const totalDropPct = funnel.length ? Math.round(((funnel[0]?.learners - funnel[funnel.length - 1]?.learners) / (funnel[0]?.learners || 1)) * 100) : 0;
@@ -71,7 +73,7 @@ export default function CreatorDashboard() {
         </button>
       </div>
 
-      {showCopilot ? <CreatorActionFeed cohortId={COURSE_ID} /> : (
+      {showCopilot ? <CreatorActionFeed cohortId={String(cohortId)} /> : (
         <>
           {loading && <div className="text-xs text-gray-400 text-center py-2">Fetching live data…</div>}
 

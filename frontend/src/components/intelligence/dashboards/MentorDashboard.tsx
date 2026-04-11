@@ -9,7 +9,7 @@ import { useDemoMode } from "@/context/DemoModeContext";
 import type { LearnerRisk, Intervention } from "@/types/intelligence";
 import { AlertTriangle, Users, Zap, Sparkles, ArrowRight, Clock, MessageSquare, RotateCcw } from "lucide-react";
 
-const COHORT_ID = "10";
+
 
 const ACTION_LABELS: Record<string, { label: string; color: string; bg: string }> = {
   repetition:        { label: "Assign targeted practice", color: "text-orange-600 dark:text-orange-400", bg: "bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800" },
@@ -44,7 +44,11 @@ function mapSignalsToInterventions(data: any): Intervention[] {
   );
 }
 
-export default function MentorDashboard() {
+interface Props {
+  cohortId?: string | number;
+}
+
+export default function MentorDashboard({ cohortId = "10" }: Props) {
   const { demo } = useDemoMode();
   const [learners, setLearners] = useState<LearnerRisk[]>([]);
   const [interventions, setInterventions] = useState<Intervention[]>([]);
@@ -59,13 +63,13 @@ export default function MentorDashboard() {
     }
     setLoading(true);
     Promise.all([
-      fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/mentor/${COHORT_ID}/briefing`).then(r => r.ok ? r.json() : null),
-      fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/cohort/${COHORT_ID}/signals`).then(r => r.ok ? r.json() : null),
+      fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/mentor/${cohortId}/briefing`).then(r => r.ok ? r.json() : null),
+      fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/cohort/${cohortId}/signals`).then(r => r.ok ? r.json() : null),
     ]).then(([briefing, sig]) => {
       if (briefing) setLearners(mapBriefing(briefing));
       if (sig) { setInterventions(mapSignalsToInterventions(sig)); setSignals(sig); }
     }).catch(console.error).finally(() => setLoading(false));
-  }, [demo]);
+  }, [demo, cohortId]);
 
   const critical = learners.filter(l => l.riskLevel === "critical").length;
   const high = learners.filter(l => l.riskLevel === "high").length;
@@ -95,7 +99,7 @@ export default function MentorDashboard() {
         </button>
       </div>
 
-      {showCopilot ? <MentorActionFeed cohortId={COHORT_ID} /> : (
+      {showCopilot ? <MentorActionFeed cohortId={String(cohortId)} /> : (
         <>
           {loading && <div className="text-xs text-gray-400 text-center py-2">Fetching live data…</div>}
 

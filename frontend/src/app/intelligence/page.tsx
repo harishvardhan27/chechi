@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import MentorDashboard from "@/components/intelligence/dashboards/MentorDashboard";
 import CreatorDashboard from "@/components/intelligence/dashboards/CreatorDashboard";
 import OperatorDashboard from "@/components/intelligence/dashboards/OperatorDashboard";
@@ -24,6 +25,11 @@ function IntelligencePageInner() {
   const { demo, setDemo } = useDemoMode();
   useThemePreference();
 
+  const searchParams = useSearchParams();
+  const cohortId = searchParams.get("cohortId");
+  const learnerId = searchParams.get("learnerId");
+  const cohortName = searchParams.get("cohortName") || "Cohort 1 · Python Bootcamp";
+
   return (
     <div className="min-h-screen bg-white dark:bg-black text-black dark:text-white">
       <Header showCreateCourseButton={false} />
@@ -33,7 +39,7 @@ function IntelligencePageInner() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-light">Intelligence</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Cohort 1 · Python Bootcamp</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{cohortName}</p>
           </div>
           <button
             onClick={() => setDemo(!demo)}
@@ -69,7 +75,8 @@ function IntelligencePageInner() {
           ))}
         </div>
 
-        <ActiveDashboard />
+        {/* @ts-ignore */}
+        <ActiveDashboard cohortId={cohortId || undefined} learnerId={learnerId || undefined} />
       </div>
     </div>
   );
@@ -78,7 +85,9 @@ function IntelligencePageInner() {
 export default function IntelligencePage() {
   return (
     <DemoModeProvider>
-      <IntelligencePageInner />
+      <Suspense fallback={<div className="p-8 text-center text-sm text-gray-500">Loading intelligence engine...</div>}>
+        <IntelligencePageInner />
+      </Suspense>
     </DemoModeProvider>
   );
 }

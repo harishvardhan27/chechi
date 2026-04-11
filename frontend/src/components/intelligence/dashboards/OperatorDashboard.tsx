@@ -8,9 +8,11 @@ import { useDemoMode } from "@/context/DemoModeContext";
 import type { Intervention, InterventionTiming, AccuracySlice } from "@/types/intelligence";
 import { Activity, CheckCircle, Clock, TrendingDown, Users, ArrowRight, AlertTriangle } from "lucide-react";
 
-const COHORT_ID = 10;
+interface Props {
+  cohortId?: string | number;
+}
 
-export default function OperatorDashboard() {
+export default function OperatorDashboard({ cohortId = 10 }: Props) {
   const { demo } = useDemoMode();
   const [interventions, setInterventions] = useState<Intervention[]>([]);
   const [timing, setTiming] = useState<InterventionTiming[]>([]);
@@ -24,7 +26,7 @@ export default function OperatorDashboard() {
       setLoading(false); return;
     }
     setLoading(true);
-    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/cohort/${COHORT_ID}/signals`)
+    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/cohort/${cohortId}/signals`)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (!data) return;
@@ -88,7 +90,7 @@ export default function OperatorDashboard() {
         setCohortInsights(insights);
       })
       .catch(console.error).finally(() => setLoading(false));
-  }, [demo]);
+  }, [demo, cohortId]);
 
   const totalSignals = interventions.length;
   const resolved = interventions.filter(i => i.outcome === "positive").length;
@@ -146,7 +148,7 @@ export default function OperatorDashboard() {
 
       <div className="grid grid-cols-4 gap-4">
         <div className="col-span-2"><TimeToInterventionChart data={timing} /></div>
-        <div className="col-span-1"><BanditArmChart cohortId={COHORT_ID} /></div>
+        <div className="col-span-1"><BanditArmChart cohortId={cohortId} /></div>
         <div className="col-span-1"><SystemAccuracyChart data={accuracy} /></div>
       </div>
 

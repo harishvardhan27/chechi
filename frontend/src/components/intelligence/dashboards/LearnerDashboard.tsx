@@ -8,10 +8,12 @@ import { useDemoMode } from "@/context/DemoModeContext";
 import type { RadarStat, VelocityPoint } from "@/types/intelligence";
 import { Star, TrendingUp, Target, ArrowRight, AlertTriangle, CheckCircle, BookOpen } from "lucide-react";
 
-const LEARNER_ID = 3;
-const COHORT_ID = 10;
+interface Props {
+  cohortId?: string | number;
+  learnerId?: string | number;
+}
 
-export default function LearnerDashboard() {
+export default function LearnerDashboard({ cohortId = 10, learnerId = 3 }: Props) {
   const { demo } = useDemoMode();
   const [radar, setRadar] = useState<RadarStat[]>([]);
   const [velocity, setVelocity] = useState<VelocityPoint[]>([]);
@@ -37,9 +39,9 @@ export default function LearnerDashboard() {
     }
     setLoading(true);
     Promise.all([
-      fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/learner/${LEARNER_ID}/preread?cohort_id=${COHORT_ID}`).then(r => r.ok ? r.json() : null).catch(() => null),
-      fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/learner/${LEARNER_ID}/profile?cohort_id=${COHORT_ID}`).then(r => r.ok ? r.json() : null).catch(() => null),
-      fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/bandit/${COHORT_ID}/learner-scores`).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/learner/${learnerId}/preread?cohort_id=${cohortId}`).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/learner/${learnerId}/profile?cohort_id=${cohortId}`).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/intelligence/bandit/${cohortId}/learner-scores`).then(r => r.ok ? r.json() : null).catch(() => null),
     ]).then(([preread, profile, rlData]) => {
       if (preread) {
         const vel = preread.velocity;
@@ -66,11 +68,11 @@ export default function LearnerDashboard() {
         }
       }
       if (rlData?.learners) {
-        const me = rlData.learners.find((l: any) => l.learner_id === LEARNER_ID);
+        const me = rlData.learners.find((l: any) => String(l.learner_id) === String(learnerId));
         if (me) setRlScore(me.rl_score);
       }
     }).catch(console.error).finally(() => setLoading(false));
-  }, [demo]);
+  }, [demo, cohortId, learnerId]);
 
   return (
     <div className="space-y-6">
