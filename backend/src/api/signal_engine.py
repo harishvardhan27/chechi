@@ -6,6 +6,7 @@ and detects completion velocity drops.
 """
 
 from typing import Dict, List, Optional
+import time
 from api.utils.db import execute_db_operation
 from api.config import (
     chat_history_table_name,
@@ -33,6 +34,12 @@ MAX_TIME_MINUTES = 60          # 60+ minutes → full weight
 
 SYSTEMIC_THRESHOLD = 0.35      # >35% learners struggling → systemic
 VELOCITY_DROP_THRESHOLD = 0.50 # >50% drop in tasks/day → risk
+
+# ---------------------------------------------------------------------------
+# Caching Configuration
+# ---------------------------------------------------------------------------
+_THRESHOLD_CACHE: Dict[tuple, tuple] = {}
+CACHE_TTL_SECONDS = 3600  # 1 hour
 
 
 # ---------------------------------------------------------------------------
@@ -123,6 +130,11 @@ async def _get_time_on_task_minutes(learner_id: int, task_id: int) -> float:
 # ---------------------------------------------------------------------------
 
 async def _get_dynamic_chat_threshold(task_id: int) -> float:
+    cache_key = (task_id, "chat")
+    cached = _THRESHOLD_CACHE.get(cache_key)
+    if cached and time.time() - cached[1] < CACHE_TTL_SECONDS:
+        return cached[0]
+
     row = await execute_db_operation(
         f"""
         SELECT AVG(user_turns) FROM (
@@ -137,9 +149,16 @@ async def _get_dynamic_chat_threshold(task_id: int) -> float:
         fetch_one=True
     )
     avg_turns = row[0] if row and row[0] else 0
-    return max(avg_turns * 2.0, 5.0) if avg_turns > 0 else float(MAX_CHAT_TURNS)
+    val = max(avg_turns * 2.0, 5.0) if avg_turns > 0 else float(MAX_CHAT_TURNS)
+    _THRESHOLD_CACHE[cache_key] = (val, time.time())
+    return val
 
 async def _get_dynamic_attempt_threshold(task_id: int) -> float:
+    cache_key = (task_id, "attempt")
+    cached = _THRESHOLD_CACHE.get(cache_key)
+    if cached and time.time() - cached[1] < CACHE_TTL_SECONDS:
+        return cached[0]
+
     row = await execute_db_operation(
         f"""
         SELECT AVG(attempts) FROM (
@@ -153,9 +172,16 @@ async def _get_dynamic_attempt_threshold(task_id: int) -> float:
         fetch_one=True
     )
     avg_attempts = row[0] if row and row[0] else 0
-    return max(avg_attempts * 2.0, 3.0) if avg_attempts > 0 else float(MAX_ATTEMPTS)
+    val = max(avg_attempts * 2.0, 3.0) if avg_attempts > 0 else float(MAX_ATTEMPTS)
+    _THRESHOLD_CACHE[cache_key] = (val, time.time())
+    return val
 
 async def _get_dynamic_time_threshold(task_id: int) -> float:
+    cache_key = (task_id, "time")
+    cached = _THRESHOLD_CACHE.get(cache_key)
+    if cached and time.time() - cached[1] < CACHE_TTL_SECONDS:
+        return cached[0]
+
     row = await execute_db_operation(
         f"""
         SELECT AVG(session_minutes) FROM (
@@ -170,7 +196,9 @@ async def _get_dynamic_time_threshold(task_id: int) -> float:
         fetch_one=True
     )
     avg_mins = row[0] if row and row[0] else 0
-    return max(avg_mins * 1.5, 15.0) if avg_mins > 0 else float(MAX_TIME_MINUTES)
+    val = max(avg_mins * 1.5, 15.0) if avg_mins > 0 else float(MAX_TIME_MINUTES)
+    _THRESHOLD_CACHE[cache_key] = (val, time.time())
+    return val
 
 async def compute_friction_score(
     learner_id: int, task_id: int, cohort_id: int

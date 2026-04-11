@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import SkillRadarChart from "@/components/intelligence/charts/SkillRadarChart";
 import VelocityChart from "@/components/intelligence/charts/VelocityChart";
+import IntelligentHintModal from "@/components/intelligence/IntelligentHintModal";
 import { mockRadarStats as MOCK_RADAR, mockVelocityPoints as MOCK_VELOCITY } from "@/lib/intelligenceMockData";
 import { useDemoMode } from "@/context/DemoModeContext";
 import type { RadarStat, VelocityPoint } from "@/types/intelligence";
@@ -22,6 +23,10 @@ export default function LearnerDashboard() {
   const [suggestedAction, setSuggestedAction] = useState("");
   const [rlScore, setRlScore] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showNudge, setShowNudge] = useState(false);
+
+  const nudgeMessage = "Hey Alice, I noticed you've been working on the 'Recursive Functions' task for a while and have tried a few different approaches. \n\nSometimes it helps to draw out the call stack on paper. Let me know if you want to look at a simple example together!";
+
 
   useEffect(() => {
     if (demo) {
@@ -72,7 +77,7 @@ export default function LearnerDashboard() {
       {loading && <div className="text-xs text-gray-400 text-center py-2">Fetching live data…</div>}
 
       {/* Welcome banner */}
-      <div className="rounded-xl border border-indigo-500/20 bg-indigo-50 dark:bg-indigo-500/5 p-5 flex items-center justify-between">
+      <div className="rounded-xl border border-indigo-500/20 bg-indigo-50 dark:bg-indigo-500/5 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <p className="text-indigo-400 text-xs mb-1">Welcome back</p>
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{name}</h2>
@@ -81,9 +86,19 @@ export default function LearnerDashboard() {
           </p>
         </div>
         {rlScore !== null && (
-          <div className="text-right">
-            <p className={`text-3xl font-bold ${rlScore >= 80 ? "text-green-400" : rlScore >= 60 ? "text-amber-400" : "text-red-400"}`}>{rlScore}</p>
-            <p className="text-xs text-gray-500 dark:text-white/40">RL score</p>
+          <div className="flex items-center gap-5 self-end sm:self-auto">
+            {demo && (
+              <button 
+                onClick={() => setShowNudge(true)} 
+                className="px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-wider font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-500/20 transition-all border border-purple-400/50"
+              >
+                Test Agentic Nudge 
+              </button>
+            )}
+            <div className="text-right">
+              <p className={`text-3xl font-bold ${rlScore >= 80 ? "text-green-400" : rlScore >= 60 ? "text-amber-400" : "text-red-400"}`}>{rlScore}</p>
+              <p className="text-xs text-gray-500 dark:text-white/40">RL score</p>
+            </div>
           </div>
         )}
       </div>
@@ -144,6 +159,8 @@ export default function LearnerDashboard() {
         <SkillRadarChart data={radar} />
         <VelocityChart data={velocity} />
       </div>
+
+      {showNudge && <IntelligentHintModal message={nudgeMessage} onClose={() => setShowNudge(false)} />}
     </div>
   );
 }
