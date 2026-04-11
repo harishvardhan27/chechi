@@ -121,21 +121,71 @@ class CreatorSystemicDraft(BaseModel):
     revised_instructions: str = Field(..., description="New markdown instructions fixing the identified gap.")
 
 async def draft_creator_briefing(cohort_id: int) -> List[Dict]:
-    """Generates the Action Feed for the Creator Copilot."""
+    """Generates the Action Feed for the Creator Copilot based on actual chat transcripts."""
     systemic_issues = await get_systemic_issues(cohort_id)
     
     feed_items = []
     for issue in systemic_issues:
-        if issue["severity"] == "high":
-            # Just an example template
+        if issue.get("severity") == "high" or issue.get("classification") == "systemic":
+            task_id = issue["task_id"]
+            
+            # 1. Fetch recent chat history for this specific failing task across the cohort
+            chat_rows = await execute_db_operation(
+                f"""
+                SELECT ch.role, ch.content, ch.user_id
+                FROM {chat_history_table_name} ch
+                JOIN {questions_table_name} q ON ch.question_id = q.id
+                WHERE q.task_id = ? AND ch.deleted_at IS NULL
+                ORDER BY ch.created_at DESC
+                LIMIT 50
+                """,
+                (task_id,), fetch_all=True
+            )
+            
+            transcript_context = "No recent chat history."
+            if chat_rows:
+                transcript_context = "\n".join([f"User {r[2]} ({r[0]}): {r[1]}" for r in chat_rows if r[1]])
+            
+            # 2. Ask the LLM to identify the exact cause and write a fix
+            prompt = f"""
+            Task Title: {issue['task_title']}
+            Percentage of Cohort Stuck: {issue.get('stuck_pct', 'Unknown')}%
+            
+            Recent Chat Transcript from struggling learners:
+            {transcript_context[-3500:]}
+            
+            Analyze these transcripts. Why are all the students failing? What is physically wrong or missing from the current task instructions?
+            Then, draft new Markdown instructions that explicitly resolve this issue.
+            """
+            
+            try:
+                res = await run_llm_with_openai(
+                    model=openai_plan_to_model_name["text-mini"],
+                    messages=[
+                        {"role": "system", "content": "You are an expert curriculum architect fixing systemic broken modules in an LMS."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    response_model=CreatorSystemicDraft,
+                    max_output_tokens=1000,
+                    api_mode="chat_completions"
+                )
+                
+                diagnosis_text = res.diagnosis
+                draft_text = res.revised_instructions
+            except Exception as e:
+                print(f"Creator Copilot Draft Error: {e}")
+                diagnosis_text = "Multiple learners are expressing confusion based on recent chat volume. Review the instructions closely."
+                draft_text = "Failed to generate revised markdown."
+
+            # 3. Append to feed
             feed_items.append({
                 "id": str(uuid.uuid4()),
                 "task_id": issue["task_id"],
                 "task_title": issue["task_title"],
-                "stuck_pct": issue["stuck_pct"],
-                "diagnosis": "The instructions fail to mention how to handle zero-index iteration boundaries, causing cohort-wide off-by-one errors.",
+                "stuck_pct": issue.get("stuck_pct", 0),
+                "diagnosis": diagnosis_text,
                 "action_type": "regenerate_task",
-                "action_draft": "Revised Markdown to replace current task text...",
+                "action_draft": draft_text,
                 "status": "pending_approval"
             })
             
