@@ -22,7 +22,7 @@ export default function MentorActionFeed({ cohortId }: { cohortId: string }) {
     const [resolvedIds, setResolvedIds] = useState<string[]>([]);
 
     useEffect(() => {
-        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/agents/mentor/briefing/${cohortId}`)
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/agent/mentor/briefing/${cohortId}`)
             .then(res => res.json())
             .then(data => setFeed(data.data || []))
             .catch(console.error)
@@ -32,7 +32,7 @@ export default function MentorActionFeed({ cohortId }: { cohortId: string }) {
     const handleApprove = async (action: ActionDraft) => {
         setProcessingId(action.id);
         try {
-            await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/agents/execute-action`, {
+            await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/agent/execute-action`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

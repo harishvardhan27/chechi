@@ -42,7 +42,6 @@ export default function ClientLeaderboardView({
     useEffect(() => {
         const fetchLeaderboardData = async () => {
             if (!cohortId || !user?.id) return;
-
             setLoading(true);
 
             try {
