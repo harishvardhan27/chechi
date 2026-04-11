@@ -7,7 +7,6 @@ Message: AI-generated (OpenAI, context-aware)
 
 from typing import Dict, Optional
 from pydantic import BaseModel
-from api.llm import run_llm_with_openai
 from api.config import openai_plan_to_model_name
 
 
@@ -93,23 +92,24 @@ class InterventionMessage(BaseModel):
 
 
 async def generate_action_message(context: Dict) -> Dict:
-    """
-    Generates a personalized intervention message using OpenAI.
-
-    context keys:
-      - learner_name: str
-      - action_type: str
-      - reasons: list[str]
-      - task_title: str (optional)
-      - friction_score: float (optional)
-      - velocity_risk: bool (optional)
-    """
     learner_name = context.get("learner_name", "the learner")
     action_type = context.get("action_type", "monitor")
     reasons = context.get("reasons", [])
     task_title = context.get("task_title", "their current task")
     friction_score = context.get("friction_score")
     velocity_risk = context.get("velocity_risk", False)
+
+    # Fallback message when OpenAI is unavailable
+    from api.settings import settings
+    if not settings.openai_api_key:
+        signals_text = ", ".join(reasons) if reasons else "struggle signals"
+        return {
+            "subject": f"Check in with {learner_name}",
+            "message": f"Hey {learner_name}, noticed you've been working on {task_title}. Signals: {signals_text}. Want to chat?",
+            "tone": "supportive",
+            "action_type": action_type,
+            "generated_for": learner_name,
+        }
 
     signals_text = ", ".join(reasons) if reasons else "general struggle signals"
     velocity_note = " Their completion pace has also dropped recently." if velocity_risk else ""
@@ -128,16 +128,18 @@ async def generate_action_message(context: Dict) -> Dict:
         "Generate a subject line and message body."
     )
 
-    result = await run_llm_with_openai(
+    import openai
+    client = openai.AsyncOpenAI()
+    response = await client.chat.completions.parse(
         model=openai_plan_to_model_name["text-mini"],
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
-        response_model=InterventionMessage,
-        max_output_tokens=300,
-        api_mode="chat_completions",
+        response_format=InterventionMessage,
+        max_completion_tokens=300,
     )
+    result = response.choices[0].message.parsed
 
     return {
         "subject": result.subject,

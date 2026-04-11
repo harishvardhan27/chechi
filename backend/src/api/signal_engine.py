@@ -241,18 +241,21 @@ async def compute_friction_score(
     )
 
     # Save to Friction computations for feedback loop
-    fc_id = str(uuid.uuid4())
-    signals_json = json.dumps({
-        "chat": chat_norm, "attempts": attempt_norm, "score": score_norm, "time": time_norm, "llm": llm_sentiment
-    })
-    await execute_db_operation(
-        f"""
-        INSERT INTO {friction_computations_table_name} 
-        (id, user_id, cohort_id, task_id, arm_id, friction_score, signals_json) 
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
-        (fc_id, learner_id, cohort_id, task_id, arm_id, friction, signals_json)
-    )
+    try:
+        fc_id = str(uuid.uuid4())
+        signals_json = json.dumps({
+            "chat": chat_norm, "attempts": attempt_norm, "score": score_norm, "time": time_norm, "llm": llm_sentiment
+        })
+        await execute_db_operation(
+            f"""
+            INSERT INTO {friction_computations_table_name} 
+            (id, user_id, cohort_id, task_id, arm_id, friction_score, signals_json) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (fc_id, learner_id, cohort_id, task_id, arm_id, friction, signals_json)
+        )
+    except Exception:
+        pass  # Table may not exist on older DBs; friction score still returned
 
     reasons = []
     if chat_norm >= 0.5:

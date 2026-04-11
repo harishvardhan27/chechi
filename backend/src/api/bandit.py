@@ -42,15 +42,18 @@ class UCB1Bandit:
 
     async def get_state(self) -> Dict[str, Dict]:
         """Fetch current MAB state for this cohort from DB. Initialize if empty."""
-        rows = await execute_db_operation(
-            f"""
-            SELECT arm_id, pull_count, avg_reward, ucb_score 
-            FROM {bandit_weight_history_table_name}
-            WHERE cohort_id = ?
-            """,
-            (self.cohort_id,),
-            fetch_all=True
-        )
+        try:
+            rows = await execute_db_operation(
+                f"""
+                SELECT arm_id, pull_count, avg_reward, ucb_score 
+                FROM {bandit_weight_history_table_name}
+                WHERE cohort_id = ?
+                """,
+                (self.cohort_id,),
+                fetch_all=True
+            )
+        except Exception:
+            rows = []
 
         state = {}
         for r in rows:
@@ -71,14 +74,17 @@ class UCB1Bandit:
                 }
                 # Create initial row
                 new_id = str(uuid.uuid4())
-                await execute_db_operation(
-                    f"""
-                    INSERT INTO {bandit_weight_history_table_name} 
-                    (id, cohort_id, arm_id, pull_count, avg_reward, ucb_score)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    """,
-                    (new_id, self.cohort_id, arm_id, 0, 0.0, float('inf'))
-                )
+                try:
+                    await execute_db_operation(
+                        f"""
+                        INSERT INTO {bandit_weight_history_table_name} 
+                        (id, cohort_id, arm_id, pull_count, avg_reward, ucb_score)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        (new_id, self.cohort_id, arm_id, 0, 0.0, float('inf'))
+                    )
+                except Exception:
+                    pass
                 
         return state
 

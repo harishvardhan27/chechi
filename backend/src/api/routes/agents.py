@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from api.agentic_engine import draft_mentor_briefing, draft_creator_briefing
 from api.bandit import UCB1Bandit
 
-router = APIRouter(prefix="/agents", tags=["agents"])
+router = APIRouter(tags=["agents"])
 
 class ExecuteActionRequest(BaseModel):
     action_id: str
@@ -50,10 +50,10 @@ async def execute_action(request: ExecuteActionRequest):
     query = ""
     params = ()
     if learner_id:
-        query = f"SELECT cohort_id, arm_id FROM {friction_computations_table_name} WHERE user_id = ? ORDER BY created_at DESC LIMIT 1"
+        query = f"SELECT cohort_id, arm_id FROM {friction_computations_table_name} WHERE user_id = ? ORDER BY computed_at DESC LIMIT 1"
         params = (learner_id,)
     elif task_id:
-        query = f"SELECT cohort_id, arm_id FROM {friction_computations_table_name} WHERE task_id = ? ORDER BY created_at DESC LIMIT 1"
+        query = f"SELECT cohort_id, arm_id FROM {friction_computations_table_name} WHERE task_id = ? ORDER BY computed_at DESC LIMIT 1"
         params = (task_id,)
 
     if query:

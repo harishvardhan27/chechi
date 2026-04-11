@@ -142,6 +142,7 @@ app.include_router(agents.router, prefix="/agent", tags=["agents"])
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    import traceback
     logging.error(
         f"Unhandled exception: {type(exc).__name__}: {str(exc)} "
         f"on {request.method} {request.url.path}",

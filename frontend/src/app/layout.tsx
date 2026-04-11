@@ -10,13 +10,15 @@ const geistSans = Geist({
   display: "swap",
   weight: ["400", "500", "600"],
   fallback: ["system-ui", "arial"],
+  preload: false,
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
   display: "swap",
-  fallback: ["system-ui", "arial"],
+  fallback: ["ui-monospace", "monospace"],
+  preload: false,
 });
 
 export const metadata: Metadata = {

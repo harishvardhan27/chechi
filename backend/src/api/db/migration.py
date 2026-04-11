@@ -231,5 +231,81 @@ async def cleanup_invalid_chat_history():
         await conn.commit()
 
 
+async def create_intelligence_tables_migration():
+    """
+    Migration: Creates intelligence tables only if they don't already exist.
+    Checks sqlite_master first — runs DDL only once ever.
+    """
+    async with get_new_db_connection() as conn:
+        cursor = await conn.cursor()
+
+        # Check which tables are missing
+        await cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name IN "
+            "('friction_computations','interventions','bandit_weight_history','agent_briefings')"
+        )
+        existing = {row[0] for row in await cursor.fetchall()}
+
+        if len(existing) == 4:
+            # All tables already exist — nothing to do
+            return
+
+        if 'friction_computations' not in existing:
+            await cursor.execute("""
+                CREATE TABLE friction_computations (
+                    id TEXT PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    cohort_id INTEGER NOT NULL,
+                    task_id INTEGER,
+                    arm_id TEXT NOT NULL,
+                    friction_score REAL NOT NULL,
+                    signals_json TEXT NOT NULL,
+                    computed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )""")
+            await cursor.execute("CREATE INDEX idx_fc_user_id ON friction_computations (user_id)")
+            await cursor.execute("CREATE INDEX idx_fc_cohort_id ON friction_computations (cohort_id)")
+
+        if 'interventions' not in existing:
+            await cursor.execute("""
+                CREATE TABLE interventions (
+                    id TEXT PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    mentor_id INTEGER NOT NULL,
+                    task_id INTEGER,
+                    friction_computation_id TEXT NOT NULL,
+                    message_sent TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    reward_status TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )""")
+
+        if 'bandit_weight_history' not in existing:
+            await cursor.execute("""
+                CREATE TABLE bandit_weight_history (
+                    id TEXT PRIMARY KEY,
+                    cohort_id INTEGER NOT NULL,
+                    arm_id TEXT NOT NULL,
+                    pull_count INTEGER NOT NULL,
+                    avg_reward REAL NOT NULL,
+                    ucb_score REAL NOT NULL,
+                    recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )""")
+
+        if 'agent_briefings' not in existing:
+            await cursor.execute("""
+                CREATE TABLE agent_briefings (
+                    id TEXT PRIMARY KEY,
+                    cohort_id INTEGER NOT NULL,
+                    role TEXT NOT NULL,
+                    briefing_text TEXT NOT NULL,
+                    context_json TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )""")
+
+        await conn.commit()
+
+
 async def run_migrations():
     await cleanup_invalid_chat_history()
+    await create_intelligence_tables_migration()

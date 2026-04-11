@@ -420,47 +420,61 @@ async def trigger_action(request: TriggerActionRequest):
     Computes friction score for a learner+task, recommends an action,
     and generates an AI-powered intervention message.
     """
-    friction = await compute_friction_score(
-        request.learner_id, request.task_id, request.cohort_id
-    )
-    classification = await classify_signal(request.task_id, request.cohort_id)
-    velocity = await compute_completion_velocity(request.learner_id, request.cohort_id)
+    import logging
+    import traceback
+    try:
+        friction = await compute_friction_score(
+            request.learner_id, request.task_id, request.cohort_id
+        )
+        classification = await classify_signal(request.task_id, request.cohort_id)
+        velocity = await compute_completion_velocity(request.learner_id, request.cohort_id)
 
-    # Merge signals for rule engine
-    signal_context = {
-        **friction,
-        "velocity_risk": velocity["velocity_risk"],
-        "classification": classification["classification"],
-    }
+        signal_context = {
+            **friction,
+            "velocity_risk": velocity["velocity_risk"],
+            "classification": classification["classification"],
+        }
 
-    action = recommend_action(signal_context)
+        action = recommend_action(signal_context)
 
-    # Get task title for message context
-    task_row = await execute_db_operation(
-        f"SELECT title FROM {tasks_table_name} WHERE id = ?",
-        (request.task_id,),
-        fetch_one=True,
-    )
-    task_title = task_row[0] if task_row else f"Task {request.task_id}"
+        task_row = await execute_db_operation(
+            f"SELECT title FROM {tasks_table_name} WHERE id = ?",
+            (request.task_id,),
+            fetch_one=True,
+        )
+        task_title = task_row[0] if task_row else f"Task {request.task_id}"
 
-    message = await generate_action_message({
-        "learner_name": request.learner_name or f"Learner #{request.learner_id}",
-        "action_type": action["action_type"],
-        "reasons": friction["reasons"],
-        "task_title": task_title,
-        "friction_score": friction["friction_score"],
-        "velocity_risk": velocity["velocity_risk"],
-    })
+        learner_name = request.learner_name or f"Learner #{request.learner_id}"
+        try:
+            message = await generate_action_message({
+                "learner_name": learner_name,
+                "action_type": action["action_type"],
+                "reasons": friction["reasons"],
+                "task_title": task_title,
+                "friction_score": friction["friction_score"],
+                "velocity_risk": velocity["velocity_risk"],
+            })
+        except Exception:
+            message = {
+                "subject": f"Check in with {learner_name}",
+                "message": f"Hey {learner_name}, noticed you've been working on {task_title}. Want to chat?",
+                "tone": "supportive",
+                "action_type": action["action_type"],
+                "generated_for": learner_name,
+            }
 
-    return {
-        "learner_id": request.learner_id,
-        "task_id": request.task_id,
-        "friction": friction,
-        "classification": classification,
-        "velocity": velocity,
-        "recommended_action": action,
-        "intervention_message": message,
-    }
+        return {
+            "learner_id": request.learner_id,
+            "task_id": request.task_id,
+            "friction": friction,
+            "classification": classification,
+            "velocity": velocity,
+            "recommended_action": action,
+            "intervention_message": message,
+        }
+    except Exception as e:
+        logging.error(f"trigger_action error: {traceback.format_exc()}")
+        return {"error": str(e), "traceback": traceback.format_exc()}
 
 
 # ---------------------------------------------------------------------------
