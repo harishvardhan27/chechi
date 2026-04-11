@@ -18,6 +18,7 @@ export default function CreatorActionFeed({ cohortId }: { cohortId: string }) {
     const [feed, setFeed] = useState<SystemicDraft[]>([]);
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
+    const [resolvedIds, setResolvedIds] = useState<string[]>([]);
 
     useEffect(() => {
         fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/agents/creator/briefing/${cohortId}`)
@@ -39,7 +40,11 @@ export default function CreatorActionFeed({ cohortId }: { cohortId: string }) {
                     context: { task_id: action.task_id, draft: action.action_draft }
                 })
             });
-            setFeed(prev => prev.filter(a => a.id !== action.id));
+            setResolvedIds(prev => [...prev, action.id]);
+            setTimeout(() => {
+                setFeed(prev => prev.filter(a => a.id !== action.id));
+                setResolvedIds(prev => prev.filter(id => id !== action.id));
+            }, 2000);
         } catch (e) {
             console.error(e);
         }
@@ -84,11 +89,23 @@ export default function CreatorActionFeed({ cohortId }: { cohortId: string }) {
             </div>
 
             <div className="grid gap-6">
-                {feed.map(action => (
+                {feed.map(action => {
+                    const isResolved = resolvedIds.includes(action.id);
+                    return (
                     <div 
                         key={action.id} 
                         className="group relative overflow-hidden bg-gradient-to-b from-[#1c1414] to-[#140c0c] border border-[#352020] hover:border-[#452a2a] rounded-2xl transition-all duration-300 backdrop-blur-2xl shadow-xl hover:shadow-orange-500/5"
                     >
+                            {isResolved && (
+                                <div className="absolute inset-0 bg-black/70 backdrop-blur-[2px] flex flex-col items-center justify-center z-50 animate-in fade-in duration-300">
+                                    <div className="w-12 h-12 rounded-full bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center text-emerald-400 mb-3 shadow-[0_0_30px_rgba(16,185,129,0.3)]">
+                                        <Check className="w-6 h-6" />
+                                    </div>
+                                    <p className="text-emerald-400 font-medium tracking-wide">Curriculum Patch Deployed</p>
+                                    <p className="text-xs text-white/50 mt-1">AI agent monitoring new baseline...</p>
+                                </div>
+                            )}
+
                         <div 
                             className="absolute top-0 right-0 w-64 h-64 bg-orange-500/10 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2" 
                         />
@@ -165,7 +182,8 @@ export default function CreatorActionFeed({ cohortId }: { cohortId: string }) {
 
                         </div>
                     </div>
-                ))}
+                );
+            })}
             </div>
         </div>
     );

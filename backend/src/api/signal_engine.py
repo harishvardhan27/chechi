@@ -122,17 +122,61 @@ async def _get_time_on_task_minutes(learner_id: int, task_id: int) -> float:
 # Core: compute_friction_score
 # ---------------------------------------------------------------------------
 
+async def _get_dynamic_chat_threshold(task_id: int) -> float:
+    row = await execute_db_operation(
+        f"""
+        SELECT AVG(user_turns) FROM (
+            SELECT ch.user_id, COUNT(ch.id) as user_turns
+            FROM {chat_history_table_name} ch
+            JOIN {questions_table_name} q ON ch.question_id = q.id
+            WHERE q.task_id = ? AND ch.role = 'user' AND ch.deleted_at IS NULL
+            GROUP BY ch.user_id
+        )
+        """,
+        (task_id,),
+        fetch_one=True
+    )
+    avg_turns = row[0] if row and row[0] else 0
+    return max(avg_turns * 2.0, 5.0) if avg_turns > 0 else float(MAX_CHAT_TURNS)
+
+async def _get_dynamic_attempt_threshold(task_id: int) -> float:
+    row = await execute_db_operation(
+        f"""
+        SELECT AVG(attempts) FROM (
+            SELECT user_id, COUNT(*) as attempts
+            FROM {task_completions_table_name}
+            WHERE task_id = ?
+            GROUP BY user_id
+        )
+        """,
+        (task_id,),
+        fetch_one=True
+    )
+    avg_attempts = row[0] if row and row[0] else 0
+    return max(avg_attempts * 2.0, 3.0) if avg_attempts > 0 else float(MAX_ATTEMPTS)
+
+async def _get_dynamic_time_threshold(task_id: int) -> float:
+    row = await execute_db_operation(
+        f"""
+        SELECT AVG(session_minutes) FROM (
+            SELECT ch.user_id, (JULIANDAY(MAX(ch.created_at)) - JULIANDAY(MIN(ch.created_at))) * 24 * 60 AS session_minutes
+            FROM {chat_history_table_name} ch
+            JOIN {questions_table_name} q ON ch.question_id = q.id
+            WHERE q.task_id = ? AND ch.deleted_at IS NULL
+            GROUP BY ch.user_id, DATE(ch.created_at)
+        )
+        """,
+        (task_id,),
+        fetch_one=True
+    )
+    avg_mins = row[0] if row and row[0] else 0
+    return max(avg_mins * 1.5, 15.0) if avg_mins > 0 else float(MAX_TIME_MINUTES)
+
 async def compute_friction_score(
     learner_id: int, task_id: int, cohort_id: int
 ) -> Dict:
     """
     Returns a friction score [0.0, 1.0] and contributing signals.
-
-    Score breakdown:
-      - chat_turns:  normalized chat volume (confusion proxy)
-      - attempts:    normalized retry count
-      - low_score:   inverted normalized scorecard score
-      - time_spent:  normalized time on task
     """
     bandit = UCB1Bandit(cohort_id)
     arm_id, weights = await bandit.select_arm()
@@ -142,13 +186,18 @@ async def compute_friction_score(
     avg_score = await _get_avg_score(learner_id, task_id)
     time_minutes = await _get_time_on_task_minutes(learner_id, task_id)
 
-    # Normalize each signal to [0, 1]
-    chat_norm = min(chat_turns / MAX_CHAT_TURNS, 1.0)
-    attempt_norm = min(attempts / MAX_ATTEMPTS, 1.0)
-    score_norm = (1.0 - avg_score) if avg_score is not None else 0.5
-    time_norm = min(time_minutes / MAX_TIME_MINUTES, 1.0)
+    # Dynamic Thresholds
+    max_chat_turns = await _get_dynamic_chat_threshold(task_id)
+    max_attempts = await _get_dynamic_attempt_threshold(task_id)
+    max_time_minutes = await _get_dynamic_time_threshold(task_id)
 
-    # LLM Sentiment Extraction (optional — falls back to 0.5 if unavailable)
+    # Normalize each signal to [0, 1]
+    chat_norm = min(chat_turns / max_chat_turns, 1.0)
+    attempt_norm = min(attempts / max_attempts, 1.0)
+    score_norm = (1.0 - avg_score) if avg_score is not None else 0.5
+    time_norm = min(time_minutes / max_time_minutes, 1.0)
+
+    # LLM Sentiment Extraction
     try:
         from api.agentic_engine import extract_sentiment_score
         llm_sentiment = await extract_sentiment_score(learner_id, task_id)

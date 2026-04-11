@@ -19,6 +19,7 @@ export default function MentorActionFeed({ cohortId }: { cohortId: string }) {
     const [feed, setFeed] = useState<ActionDraft[]>([]);
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
+    const [resolvedIds, setResolvedIds] = useState<string[]>([]);
 
     useEffect(() => {
         fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/agents/mentor/briefing/${cohortId}`)
@@ -40,8 +41,12 @@ export default function MentorActionFeed({ cohortId }: { cohortId: string }) {
                     context: { learner_id: action.learner_id }
                 })
             });
-            // optimistic remove
-            setFeed(prev => prev.filter(a => a.id !== action.id));
+            // show success state overlay, then remove after delay
+            setResolvedIds(prev => [...prev, action.id]);
+            setTimeout(() => {
+                setFeed(prev => prev.filter(a => a.id !== action.id));
+                setResolvedIds(prev => prev.filter(id => id !== action.id));
+            }, 2000);
         } catch (e) {
             console.error(e);
         }
@@ -93,15 +98,27 @@ export default function MentorActionFeed({ cohortId }: { cohortId: string }) {
             </div>
 
             <div className="grid gap-4">
-                {feed.map(action => (
-                    <div 
-                        key={action.id} 
-                        className="group relative overflow-hidden bg-gradient-to-b from-[#1c1c22] to-[#141419] border border-[#2a2a35] hover:border-[#3a3a45] rounded-2xl transition-all duration-300 backdrop-blur-2xl shadow-xl hover:shadow-purple-500/5"
-                    >
-                        {/* Dynamic Score Glow */}
+                {feed.map(action => {
+                    const isResolved = resolvedIds.includes(action.id);
+                    return (
                         <div 
-                            className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2" 
-                        />
+                            key={action.id} 
+                            className="group relative overflow-hidden bg-gradient-to-b from-[#1c1c22] to-[#141419] border border-[#2a2a35] hover:border-[#3a3a45] rounded-2xl transition-all duration-300 backdrop-blur-2xl shadow-xl hover:shadow-purple-500/5"
+                        >
+                            {isResolved && (
+                                <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex flex-col items-center justify-center z-50 animate-in fade-in duration-300">
+                                    <div className="w-12 h-12 rounded-full bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center text-emerald-400 mb-3 shadow-[0_0_30px_rgba(16,185,129,0.3)]">
+                                        <Check className="w-6 h-6" />
+                                    </div>
+                                    <p className="text-emerald-400 font-medium">Intervention dispatched successfully.</p>
+                                    <p className="text-xs text-emerald-400/60 mt-1">RL Agent tracking impact...</p>
+                                </div>
+                            )}
+                            
+                            {/* Dynamic Score Glow */}
+                            <div 
+                                className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2" 
+                            />
                         
                         <div className="p-6 relative z-10 flex flex-col md:flex-row gap-6">
                             {/* Left: Learner Context */}
@@ -167,7 +184,8 @@ export default function MentorActionFeed({ cohortId }: { cohortId: string }) {
                             </div>
                         </div>
                     </div>
-                ))}
+                );
+            })}
             </div>
         </div>
     );

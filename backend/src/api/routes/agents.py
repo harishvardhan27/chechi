@@ -39,10 +39,39 @@ async def execute_action(request: ExecuteActionRequest):
     Executes the LLM-drafted action.
     Sends realistic mock webhook success signals back to the UI.
     """
+    from api.config import friction_computations_table_name
+    from api.utils.db import execute_db_operation
+    import logging
+
+    # Try to find the arm_id that generated the friction score leading to this action
+    learner_id = request.context.get("learner_id")
+    task_id = request.context.get("task_id")
+    
+    query = ""
+    params = ()
+    if learner_id:
+        query = f"SELECT cohort_id, arm_id FROM {friction_computations_table_name} WHERE user_id = ? ORDER BY created_at DESC LIMIT 1"
+        params = (learner_id,)
+    elif task_id:
+        query = f"SELECT cohort_id, arm_id FROM {friction_computations_table_name} WHERE task_id = ? ORDER BY created_at DESC LIMIT 1"
+        params = (task_id,)
+
+    if query:
+        try:
+            row = await execute_db_operation(query, params, fetch_one=True)
+            if row:
+                cohort_id, arm_id = row
+                # We simulate a "Reward" because the mentor/creator approved the action
+                # +1.0 reinforces that this arm reliably detects actionable friction
+                bandit = UCB1Bandit(cohort_id)
+                await bandit.update_reward(arm_id, 1.0)
+                logging.info(f"Simulated +1.0 Reward for arm {arm_id} in cohort {cohort_id}")
+        except Exception as e:
+            logging.error(f"Failed to record RL reward: {e}")
+
     # In a real app we would hit Slack webhooks or trigger the AI task generator celery queue
     if request.action_type == "send_slack":
-        # Simulation of reward loop initiation
-        # Here we would note that an intervention was made, wait 7 days, then evaluate
+        # Additional async logic to dispatch message
         pass
     elif request.action_type == "regenerate_task":
         # Trigger Celery / background AI Generation Job

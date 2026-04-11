@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import TimeToInterventionChart from "@/components/intelligence/charts/TimeToInterventionChart";
 import SystemAccuracyChart from "@/components/intelligence/charts/SystemAccuracyChart";
+import BanditArmChart from "@/components/intelligence/charts/BanditArmChart";
 import { mockInterventionTimings as MOCK_TIMING, mockAccuracySlices as MOCK_ACCURACY, mockInterventions as MOCK_INTERVENTIONS } from "@/lib/intelligenceMockData";
 import { useDemoMode } from "@/context/DemoModeContext";
 import type { Intervention, InterventionTiming, AccuracySlice } from "@/types/intelligence";
@@ -143,8 +144,9 @@ export default function OperatorDashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <div className="col-span-2"><TimeToInterventionChart data={timing} /></div>
+        <div className="col-span-1"><BanditArmChart cohortId={COHORT_ID} /></div>
         <div className="col-span-1"><SystemAccuracyChart data={accuracy} /></div>
       </div>
 
