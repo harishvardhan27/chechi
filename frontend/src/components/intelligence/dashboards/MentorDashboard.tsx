@@ -128,7 +128,7 @@ export default function MentorDashboard({ cohortId = "10" }: Props) {
                 <span className="text-sm font-light text-gray-900 dark:text-white">Prioritized Actions — What needs attention now</span>
               </div>
               <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                {priorityActions.map((item, i) => (
+                {priorityActions.map((item: any, i: number) => (
                   <div key={i} className="px-4 py-3 flex items-start gap-3 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                     <span className={`text-xs px-1.5 py-0.5 rounded font-medium mt-0.5 ${item.severity === "high" ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400" : "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"}`}>
                       {item.severity}
