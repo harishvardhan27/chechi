@@ -21,19 +21,25 @@ from api.config import (
 )
 
 from api.bandit import UCB1Bandit
+from api.settings import settings
 import uuid
 import json
 
 # --- Weights are now managed dynamically by RL (UCB1Bandit) in bandit.py ---
 
-# Thresholds for normalization
-MAX_CHAT_TURNS = 20            # 20+ turns → full weight
-MAX_ATTEMPTS = 5               # 5+ attempts → full weight
-MIN_PASSING_SCORE = 0.6        # Below 60% = low score signal
-MAX_TIME_MINUTES = 60          # 60+ minutes → full weight
+# Normalization ceilings (fixed — not tunable)
+MAX_CHAT_TURNS = 20
+MAX_ATTEMPTS = 5
+MIN_PASSING_SCORE = 0.6
+MAX_TIME_MINUTES = 60
 
-SYSTEMIC_THRESHOLD = 0.35      # >35% learners struggling → systemic
-VELOCITY_DROP_THRESHOLD = 0.50 # >50% drop in tasks/day → risk
+# Thresholds — read from settings (.env), tunable without code changes
+# Set in .env: SYSTEMIC_THRESHOLD=0.35  VELOCITY_DROP_THRESHOLD=0.50 etc.
+def SYSTEMIC_THRESHOLD() -> float:              return settings.systemic_threshold
+def VELOCITY_DROP_THRESHOLD() -> float:         return settings.velocity_drop_threshold
+def REPETITION_MIN_MESSAGES() -> int:           return settings.repetition_min_messages
+def NO_SUBMISSION_MIN_MESSAGES() -> int:        return settings.no_submission_min_messages
+def TIME_ON_TASK_THRESHOLD_MINUTES() -> int:    return settings.time_on_task_threshold_minutes
 
 # ---------------------------------------------------------------------------
 # Caching Configuration
@@ -341,7 +347,7 @@ async def classify_signal(task_id: int, cohort_id: int) -> Dict:
     stuck_count = stuck_row[0] if stuck_row else 0
     stuck_ratio = stuck_count / total_learners
 
-    classification = "systemic" if stuck_ratio >= SYSTEMIC_THRESHOLD else "individual"
+    classification = "systemic" if stuck_ratio >= SYSTEMIC_THRESHOLD() else "individual"
 
     return {
         "task_id": task_id,
@@ -350,7 +356,7 @@ async def classify_signal(task_id: int, cohort_id: int) -> Dict:
         "stuck_count": stuck_count,
         "total_learners": total_learners,
         "stuck_pct": round(stuck_ratio * 100, 1),
-        "threshold_pct": round(SYSTEMIC_THRESHOLD * 100, 1),
+        "threshold_pct": round(SYSTEMIC_THRESHOLD() * 100, 1),
     }
 
 
@@ -398,7 +404,7 @@ async def compute_completion_velocity(learner_id: int, cohort_id: int) -> Dict:
     recent_avg = sum(d[1] for d in recent_window) / len(recent_window) if recent_window else 0.0
 
     drop_pct = ((prior_avg - recent_avg) / prior_avg) if prior_avg > 0 else 0.0
-    velocity_risk = drop_pct >= VELOCITY_DROP_THRESHOLD
+    velocity_risk = drop_pct >= VELOCITY_DROP_THRESHOLD()
 
     return {
         "learner_id": learner_id,

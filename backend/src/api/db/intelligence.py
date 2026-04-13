@@ -1,6 +1,7 @@
 from typing import Dict, List
 from collections import defaultdict
 from api.utils.db import execute_db_operation
+from api.settings import settings
 from api.config import (
     chat_history_table_name,
     questions_table_name,
@@ -46,8 +47,10 @@ async def get_cohort_learner_ids(cohort_id: int) -> List[Dict]:
     return [{"id": r[0], "first_name": r[1], "last_name": r[2], "email": r[3]} for r in rows]
 
 
-async def get_repetition_signals(cohort_id: int, min_repeats: int = 3) -> List[Dict]:
+async def get_repetition_signals(cohort_id: int, min_repeats: int = None) -> List[Dict]:
     """Learners who sent >= min_repeats messages on the same question in one session (same day)."""
+    if min_repeats is None:
+        min_repeats = settings.repetition_min_messages
     rows = await execute_db_operation(
         f"""
         SELECT
@@ -90,8 +93,10 @@ async def get_repetition_signals(cohort_id: int, min_repeats: int = 3) -> List[D
     ]
 
 
-async def get_time_on_task_signals(cohort_id: int, threshold_minutes: int = 30) -> List[Dict]:
+async def get_time_on_task_signals(cohort_id: int, threshold_minutes: int = None) -> List[Dict]:
     """Learners who spent significantly more time than expected on a single question."""
+    if threshold_minutes is None:
+        threshold_minutes = settings.time_on_task_threshold_minutes
     rows = await execute_db_operation(
         f"""
         SELECT
@@ -244,8 +249,10 @@ async def get_escalation_ladder_signals(cohort_id: int) -> List[Dict]:
     return signals
 
 
-async def get_no_submission_signals(cohort_id: int, min_messages: int = 5) -> List[Dict]:
+async def get_no_submission_signals(cohort_id: int, min_messages: int = None) -> List[Dict]:
     """Learners who chatted extensively but never completed the question."""
+    if min_messages is None:
+        min_messages = settings.no_submission_min_messages
     rows = await execute_db_operation(
         f"""
         SELECT
@@ -291,8 +298,10 @@ async def get_no_submission_signals(cohort_id: int, min_messages: int = 5) -> Li
     ]
 
 
-async def get_systemic_issues(cohort_id: int, threshold: float = 0.3) -> List[Dict]:
+async def get_systemic_issues(cohort_id: int, threshold: float = None) -> List[Dict]:
     """Tasks where >= threshold fraction of cohort learners are stuck (chatted but not completed)."""
+    if threshold is None:
+        threshold = settings.systemic_threshold
     learners = await get_cohort_learner_ids(cohort_id)
     total = len(learners)
     if total == 0:
